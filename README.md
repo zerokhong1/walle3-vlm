@@ -281,10 +281,8 @@ Camera frame (640×480)
 - [x] **VLM annotated camera feed (/camera/vlm_annotated)**
 - [x] **Camera-based low obstacle detection**
 - [x] **LIDAR mount optimized (z=-0.05, ~0.18m from ground)**
-- [ ] SLAM Toolbox — autonomous mapping
-- [ ] Nav2 — goal-based path planning
-- [ ] Sim-to-real transfer
-- [ ] Multi-object tracking
+- [x] **Anti-stuck: wider sectors, reverse-before-turn, corner escape**
+- [ ] Sim-to-real transfer (khi có hardware robot thật)
 
 ---
 
