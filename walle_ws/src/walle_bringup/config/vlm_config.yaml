@@ -1,0 +1,22 @@
+# WallE3 v2 — VLM Configuration (ROS 2 params format)
+# Dùng Qwen2.5-VL-3B-Instruct (~2GB VRAM INT4) cho máy RTX 3060 12GB
+
+walle_vlm_planner:
+  ros__parameters:
+    model_backend: "transformers"
+    # 3B model: cần ~2GB VRAM INT4, inference ~7s/frame
+    # 7B model: cần ~6GB VRAM INT4, inference ~1.5s/frame (nếu VRAM đủ trống)
+    model_name: "Qwen/Qwen2.5-VL-3B-Instruct"
+    quantize_4bit: true
+    language: "vi"
+    inference_interval_sec: 8.0
+    vlm_timeout_sec: 15.0
+    max_speed: 0.25
+
+walle_vlm_perception:
+  ros__parameters:
+    model_backend: "transformers"
+    model_name: "Qwen/Qwen2.5-VL-3B-Instruct"
+    quantize_4bit: true
+    language: "vi"
+    inference_interval: 12.0

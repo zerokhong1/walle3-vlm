@@ -1,0 +1,27 @@
+# ROS 2 build artifacts
+walle_ws/build/
+walle_ws/install/
+walle_ws/log/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.eggs/
+
+# Model cache (HuggingFace — too large for git)
+~/.cache/huggingface/
+
+# Logs
+*.log
+/tmp/
+
+# OS
+.DS_Store
+*.swp
+*.swo
+
+# IDE
+.vscode/
+.idea/

@@ -1,0 +1,557 @@
+<?xml version="1.0"?>
+<robot name="walle" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:arg name="name" default="walle"/>
+  <xacro:arg name="controllers_file" default=""/>
+
+  <xacro:property name="PI" value="3.1415926535897931"/>
+
+  <xacro:property name="base_height" value="0.23"/>
+  <xacro:property name="body_x" value="0.42"/>
+  <xacro:property name="body_y" value="0.34"/>
+  <xacro:property name="body_z" value="0.30"/>
+
+  <xacro:property name="wheel_radius" value="0.095"/>
+  <xacro:property name="wheel_width" value="0.055"/>
+  <xacro:property name="wheel_y" value="0.195"/>
+  <xacro:property name="wheel_z_rel" value="-0.135"/>
+  <xacro:property name="wheel_sep" value="0.39"/>
+
+  <xacro:property name="track_x" value="0.42"/>
+  <xacro:property name="track_y" value="0.09"/>
+  <xacro:property name="track_z" value="0.22"/>
+  <xacro:property name="track_offset_y" value="0.215"/>
+  <xacro:property name="track_offset_z" value="-0.03"/>
+
+  <xacro:macro name="box_inertial" params="mass x y z">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="${mass}"/>
+      <inertia
+        ixx="${(1.0/12.0) * mass * (y*y + z*z)}"
+        ixy="0.0"
+        ixz="0.0"
+        iyy="${(1.0/12.0) * mass * (x*x + z*z)}"
+        iyz="0.0"
+        izz="${(1.0/12.0) * mass * (x*x + y*y)}"/>
+    </inertial>
+  </xacro:macro>
+
+  <xacro:macro name="cylinder_inertial" params="mass radius length rpy:='0 0 0'">
+    <inertial>
+      <origin xyz="0 0 0" rpy="${rpy}"/>
+      <mass value="${mass}"/>
+      <inertia
+        ixx="${(1.0/12.0) * mass * (3.0*radius*radius + length*length)}"
+        ixy="0.0"
+        ixz="0.0"
+        iyy="${(1.0/12.0) * mass * (3.0*radius*radius + length*length)}"
+        iyz="0.0"
+        izz="${0.5 * mass * radius * radius}"/>
+    </inertial>
+  </xacro:macro>
+
+  <xacro:macro name="sphere_inertial" params="mass radius">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="${mass}"/>
+      <inertia
+        ixx="${0.4 * mass * radius * radius}"
+        ixy="0.0"
+        ixz="0.0"
+        iyy="${0.4 * mass * radius * radius}"
+        iyz="0.0"
+        izz="${0.4 * mass * radius * radius}"/>
+    </inertial>
+  </xacro:macro>
+
+  <material name="walle_yellow">
+    <color rgba="0.80 0.55 0.18 1.0"/>
+  </material>
+  <material name="walle_dark">
+    <color rgba="0.18 0.18 0.18 1.0"/>
+  </material>
+  <material name="walle_gray">
+    <color rgba="0.55 0.55 0.55 1.0"/>
+  </material>
+  <material name="walle_eye">
+    <color rgba="0.08 0.08 0.08 1.0"/>
+  </material>
+  <material name="walle_rust">
+    <color rgba="0.55 0.32 0.18 1.0"/>
+  </material>
+
+  <link name="base_footprint"/>
+
+  <link name="base_link">
+    <xacro:box_inertial mass="15.0" x="${body_x}" y="${body_y}" z="${body_z}"/>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${body_x} ${body_y} ${body_z}"/>
+      </geometry>
+      <material name="walle_yellow"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${body_x} ${body_y} ${body_z}"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 ${base_height}" rpy="0 0 0"/>
+  </joint>
+
+  <link name="left_track_cover_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${track_x} ${track_y} ${track_z}"/>
+      </geometry>
+      <material name="walle_dark"/>
+    </visual>
+  </link>
+
+  <joint name="left_track_cover_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="left_track_cover_link"/>
+    <origin xyz="0 ${track_offset_y} ${track_offset_z}" rpy="0 0 0"/>
+  </joint>
+
+  <link name="right_track_cover_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${track_x} ${track_y} ${track_z}"/>
+      </geometry>
+      <material name="walle_dark"/>
+    </visual>
+  </link>
+
+  <joint name="right_track_cover_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="right_track_cover_link"/>
+    <origin xyz="0 -${track_offset_y} ${track_offset_z}" rpy="0 0 0"/>
+  </joint>
+
+  <link name="left_wheel_link">
+    <xacro:cylinder_inertial mass="1.2" radius="${wheel_radius}" length="${wheel_width}" rpy="${PI/2} 0 0"/>
+    <visual>
+      <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
+      <geometry>
+        <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+      </geometry>
+      <material name="walle_dark"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
+      <geometry>
+        <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="left_wheel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="left_wheel_link"/>
+    <origin xyz="0 ${wheel_y} ${wheel_z_rel}" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+  <link name="right_wheel_link">
+    <xacro:cylinder_inertial mass="1.2" radius="${wheel_radius}" length="${wheel_width}" rpy="${PI/2} 0 0"/>
+    <visual>
+      <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
+      <geometry>
+        <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+      </geometry>
+      <material name="walle_dark"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
+      <geometry>
+        <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="right_wheel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="right_wheel_link"/>
+    <origin xyz="0 -${wheel_y} ${wheel_z_rel}" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+  <link name="front_support_link">
+    <xacro:sphere_inertial mass="0.10" radius="0.03"/>
+    <visual>
+      <geometry>
+        <sphere radius="0.03"/>
+      </geometry>
+      <material name="walle_gray"/>
+    </visual>
+    <collision>
+      <geometry>
+        <sphere radius="0.03"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="front_support_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="front_support_link"/>
+    <origin xyz="0.15 0 ${-base_height + 0.03}" rpy="0 0 0"/>
+  </joint>
+
+  <link name="rear_support_link">
+    <xacro:sphere_inertial mass="0.10" radius="0.03"/>
+    <visual>
+      <geometry>
+        <sphere radius="0.03"/>
+      </geometry>
+      <material name="walle_gray"/>
+    </visual>
+    <collision>
+      <geometry>
+        <sphere radius="0.03"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="rear_support_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="rear_support_link"/>
+    <origin xyz="-0.15 0 ${-base_height + 0.03}" rpy="0 0 0"/>
+  </joint>
+
+  <link name="left_arm_link">
+    <xacro:box_inertial mass="0.45" x="0.22" y="0.04" z="0.04"/>
+    <visual>
+      <origin xyz="0.11 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.22 0.04 0.04"/>
+      </geometry>
+      <material name="walle_rust"/>
+    </visual>
+    <collision>
+      <origin xyz="0.11 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.22 0.04 0.04"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="left_arm_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="left_arm_link"/>
+    <origin xyz="0.13 0.14 0.02" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.2" upper="1.0" effort="10.0" velocity="2.0"/>
+    <dynamics damping="0.2" friction="0.1"/>
+  </joint>
+
+  <link name="right_arm_link">
+    <xacro:box_inertial mass="0.45" x="0.22" y="0.04" z="0.04"/>
+    <visual>
+      <origin xyz="0.11 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.22 0.04 0.04"/>
+      </geometry>
+      <material name="walle_rust"/>
+    </visual>
+    <collision>
+      <origin xyz="0.11 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.22 0.04 0.04"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="right_arm_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="right_arm_link"/>
+    <origin xyz="0.13 -0.14 0.02" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.0" upper="1.2" effort="10.0" velocity="2.0"/>
+    <dynamics damping="0.2" friction="0.1"/>
+  </joint>
+
+  <link name="head_yaw_link">
+    <xacro:box_inertial mass="0.30" x="0.08" y="0.08" z="0.18"/>
+    <visual>
+      <origin xyz="0 0 0.09" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.06 0.06 0.18"/>
+      </geometry>
+      <material name="walle_rust"/>
+    </visual>
+  </link>
+
+  <joint name="head_yaw_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="head_yaw_link"/>
+    <origin xyz="0.05 0 0.16" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.2" upper="1.2" effort="6.0" velocity="2.0"/>
+    <dynamics damping="0.25" friction="0.1"/>
+  </joint>
+
+  <link name="head_pitch_link">
+    <xacro:box_inertial mass="0.65" x="0.20" y="0.08" z="0.08"/>
+    <visual>
+      <origin xyz="0.10 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.20 0.08 0.08"/>
+      </geometry>
+      <material name="walle_gray"/>
+    </visual>
+  </link>
+
+  <joint name="head_pitch_joint" type="revolute">
+    <parent link="head_yaw_link"/>
+    <child link="head_pitch_link"/>
+    <origin xyz="0 0 0.18" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-0.7" upper="0.8" effort="6.0" velocity="2.0"/>
+    <dynamics damping="0.25" friction="0.1"/>
+  </joint>
+
+  <link name="left_eye_link">
+    <xacro:cylinder_inertial mass="0.12" radius="0.05" length="0.08" rpy="0 ${PI/2} 0"/>
+    <visual>
+      <origin xyz="0.04 0 0" rpy="0 ${PI/2} 0"/>
+      <geometry>
+        <cylinder radius="0.05" length="0.08"/>
+      </geometry>
+      <material name="walle_eye"/>
+    </visual>
+  </link>
+
+  <joint name="left_eye_joint" type="fixed">
+    <parent link="head_pitch_link"/>
+    <child link="left_eye_link"/>
+    <origin xyz="0.16 0.045 0" rpy="0 0 0"/>
+  </joint>
+
+  <link name="right_eye_link">
+    <xacro:cylinder_inertial mass="0.12" radius="0.05" length="0.08" rpy="0 ${PI/2} 0"/>
+    <visual>
+      <origin xyz="0.04 0 0" rpy="0 ${PI/2} 0"/>
+      <geometry>
+        <cylinder radius="0.05" length="0.08"/>
+      </geometry>
+      <material name="walle_eye"/>
+    </visual>
+  </link>
+
+  <joint name="right_eye_joint" type="fixed">
+    <parent link="head_pitch_link"/>
+    <child link="right_eye_link"/>
+    <origin xyz="0.16 -0.045 0" rpy="0 0 0"/>
+  </joint>
+
+  <link name="camera_link">
+    <xacro:box_inertial mass="0.08" x="0.02" y="0.02" z="0.02"/>
+  </link>
+
+  <joint name="camera_joint" type="fixed">
+    <parent link="head_pitch_link"/>
+    <child link="camera_link"/>
+    <origin xyz="0.22 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <link name="camera_optical_frame"/>
+
+  <joint name="camera_optical_joint" type="fixed">
+    <parent link="camera_link"/>
+    <child link="camera_optical_frame"/>
+    <origin xyz="0 0 0" rpy="-${PI/2} 0 -${PI/2}"/>
+  </joint>
+
+  <link name="lidar_link">
+    <xacro:cylinder_inertial mass="0.10" radius="0.035" length="0.04"/>
+    <visual>
+      <geometry>
+        <cylinder radius="0.035" length="0.04"/>
+      </geometry>
+      <material name="walle_gray"/>
+    </visual>
+  </link>
+
+  <joint name="lidar_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="lidar_link"/>
+    <origin xyz="0.12 0 -0.05" rpy="0 0 0"/>
+  </joint>
+
+  <link name="imu_link">
+    <xacro:box_inertial mass="0.05" x="0.02" y="0.02" z="0.02"/>
+  </link>
+
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin xyz="0 0 0.04" rpy="0 0 0"/>
+  </joint>
+
+  <ros2_control name="GazeboSimSystem" type="system">
+    <hardware>
+      <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+    </hardware>
+
+    <joint name="left_wheel_joint">
+      <command_interface name="velocity">
+        <param name="min">-20.0</param>
+        <param name="max">20.0</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="right_wheel_joint">
+      <command_interface name="velocity">
+        <param name="min">-20.0</param>
+        <param name="max">20.0</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="head_yaw_joint">
+      <command_interface name="position">
+        <param name="min">-1.2</param>
+        <param name="max">1.2</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="head_pitch_joint">
+      <command_interface name="position">
+        <param name="min">-0.7</param>
+        <param name="max">0.8</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="left_arm_joint">
+      <command_interface name="position">
+        <param name="min">-1.2</param>
+        <param name="max">1.0</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="right_arm_joint">
+      <command_interface name="position">
+        <param name="min">-1.0</param>
+        <param name="max">1.2</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+  </ros2_control>
+
+  <gazebo>
+    <plugin filename="libgz_ros2_control-system.so" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+      <robot_param>robot_description</robot_param>
+      <robot_param_node>robot_state_publisher</robot_param_node>
+      <parameters>$(arg controllers_file)</parameters>
+    </plugin>
+  </gazebo>
+
+  <gazebo reference="left_wheel_link">
+    <mu1>1.5</mu1>
+    <mu2>1.5</mu2>
+    <kp>1000000.0</kp>
+    <kd>50.0</kd>
+  </gazebo>
+
+  <gazebo reference="right_wheel_link">
+    <mu1>1.5</mu1>
+    <mu2>1.5</mu2>
+    <kp>1000000.0</kp>
+    <kd>50.0</kd>
+  </gazebo>
+
+  <gazebo reference="front_support_link">
+    <mu1>0.01</mu1>
+    <mu2>0.01</mu2>
+    <kp>100000.0</kp>
+    <kd>10.0</kd>
+  </gazebo>
+
+  <gazebo reference="rear_support_link">
+    <mu1>0.01</mu1>
+    <mu2>0.01</mu2>
+    <kp>100000.0</kp>
+    <kd>10.0</kd>
+  </gazebo>
+
+  <gazebo reference="camera_link">
+    <sensor name="head_camera" type="camera">
+      <always_on>true</always_on>
+      <update_rate>15.0</update_rate>
+      <visualize>true</visualize>
+      <topic>/camera/image_raw</topic>
+      <gz_frame_id>camera_link</gz_frame_id>
+      <camera>
+        <horizontal_fov>1.3962634</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.05</near>
+          <far>30.0</far>
+        </clip>
+        <lens>
+          <type>stereographic</type>
+          <scale_to_hfov>true</scale_to_hfov>
+        </lens>
+      </camera>
+    </sensor>
+  </gazebo>
+
+  <gazebo reference="lidar_link">
+    <sensor name="lidar_sensor" type="gpu_lidar">
+      <always_on>true</always_on>
+      <update_rate>10.0</update_rate>
+      <visualize>true</visualize>
+      <topic>/scan</topic>
+      <gz_frame_id>lidar_link</gz_frame_id>
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>720</samples>
+            <resolution>1</resolution>
+            <min_angle>-1.57079632679</min_angle>
+            <max_angle>1.57079632679</max_angle>
+          </horizontal>
+        </scan>
+        <range>
+          <min>0.12</min>
+          <max>12.0</max>
+          <resolution>0.01</resolution>
+        </range>
+      </lidar>
+    </sensor>
+  </gazebo>
+
+  <gazebo reference="imu_link">
+    <sensor name="imu_sensor" type="imu">
+      <always_on>true</always_on>
+      <update_rate>100.0</update_rate>
+      <topic>/imu</topic>
+      <gz_frame_id>imu_link</gz_frame_id>
+    </sensor>
+  </gazebo>
+
+</robot>
