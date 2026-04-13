@@ -145,11 +145,10 @@ class ReactiveWander(Node):
         self._cam_stamp: Optional[Time]        = None
 
         # ── Stuck detection ─────────────────────────────────────────────────
-        self._odom_vx: float        = 0.0        # actual linear speed from odom
-        self._cmd_vx:  float        = 0.0        # last commanded linear speed
-        self._stuck_since: Optional[Time] = None  # when we started being stuck
-        self._escape_until = self.get_clock().now()  # escape maneuver end time
-        self._escape_phase = ''                   # 'reverse' | 'turn' | ''
+        self._odom_vx: float        = 0.0
+        self._cmd_vx:  float        = 0.0
+        self._stuck_since: Optional[Time] = None
+        self._escaping: bool        = False  # True while in escape maneuver
 
         self.get_logger().info(
             'Reactive wander (anti-stuck v2): wider sectors, reverse-before-turn, stuck detector.'
@@ -312,20 +311,11 @@ class ReactiveWander(Node):
                 self._pub_state('CAM_AVOID')
                 return
 
-        # ── Priority 3: Stuck detector (escape) ─────────────────────────────
-        if now < self._escape_until:
-            if self._escape_phase == 'reverse':
-                self.publish_cmd(-0.18, 0.0)
-            else:
-                self.publish_cmd(0.0, self.turn_direction * self.turn_spd * 1.2)
-            self._pub_state('ESCAPE')
-            return
-
+        # ── Priority 3: Stuck detector ───────────────────────────────────────
         if self._update_stuck(now):
             self._stuck_since = None
             self.get_logger().warn('STUCK detected — triggering escape maneuver')
             self._trigger_escape(now)
-            return
 
         # ── Priority 4 & 5: LiDAR AVOID / WANDER ───────────────────────────
         if self.scan_state is None:
@@ -333,17 +323,20 @@ class ReactiveWander(Node):
             self._pub_state('INIT')
             return
 
-        # Reverse phase (started by _start_avoid)
+        # Reverse phase — used by both _start_avoid and _trigger_escape
         if now < self.reverse_until:
             self.publish_cmd(-0.18, 0.0)
-            self._pub_state('AVOID')
+            self._pub_state('ESCAPE' if self._escaping else 'AVOID')
             return
 
         # Turn phase
         if now < self.turn_until:
-            self.publish_cmd(0.0, self.turn_direction * self.turn_spd)
-            self._pub_state('AVOID')
+            spd = self.turn_spd * (1.3 if self._escaping else 1.0)
+            self.publish_cmd(0.0, self.turn_direction * spd)
+            self._pub_state('ESCAPE' if self._escaping else 'AVOID')
             return
+
+        self._escaping = False  # escape maneuver complete
 
         # ── Sector analysis (wider + diagonal) ──────────────────────────────
         front       = self._sector_min(-0.50, 0.50)    # was ±0.30 — now wider ±0.50
@@ -413,17 +406,19 @@ class ReactiveWander(Node):
 
     def _trigger_escape(self, now: Time, turn_sign: Optional[float] = None,
                         large: bool = False) -> None:
-        """Emergency escape: long reverse then big random turn."""
-        self.turn_direction = turn_sign or (1.0 if random.random() > 0.5 else -1.0)
+        """Emergency escape: reverse then large turn. Uses same reverse_until/turn_until
+        mechanism as _start_avoid — no separate broken phase tracking."""
+        self.turn_direction = turn_sign if turn_sign is not None else \
+                              (1.0 if random.random() > 0.5 else -1.0)
         rev_dur  = random.uniform(0.8, 1.4)
         turn_dur = random.uniform(1.5, 2.5) if large else random.uniform(1.0, 1.8)
-        self._escape_phase = 'reverse'
-        self._escape_until = now + Duration(seconds=rev_dur)
-        # Schedule turn phase after reverse
-        self.reverse_until = self._escape_until
-        self.turn_until    = self._escape_until + Duration(seconds=turn_dur)
-        self._escape_until = self.turn_until
-        self._escape_phase = 'reverse'
+        self.reverse_until = now + Duration(seconds=rev_dur)
+        self.turn_until    = self.reverse_until + Duration(seconds=turn_dur)
+        self._escaping     = True
+        self._maybe_log(
+            f'[ESCAPE] reverse {rev_dur:.1f}s + turn {turn_dur:.1f}s '
+            f'{"(large)" if large else ""}'
+        )
 
     # ── YOLO behaviours ───────────────────────────────────────────────────────
 
