@@ -1,9 +1,9 @@
-"""vlm.launch.py — Launch VLM stack riêng (không khởi động Gazebo).
+"""vlm.launch.py — Launch VLM stack (without starting Gazebo).
 
-Dùng khi simulation đã chạy rồi, chỉ cần thêm VLM nodes:
+Use when simulation is already running and you only need VLM nodes:
   ros2 launch walle_bringup vlm.launch.py
 
-Hoặc tích hợp trong sim.launch.py với start_vlm:=true
+Or integrated via sim.launch.py with start_vlm:=true
 """
 
 from launch import LaunchDescription

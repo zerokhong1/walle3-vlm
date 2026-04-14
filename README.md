@@ -7,17 +7,17 @@
 [![Ubuntu](https://img.shields.io/badge/Ubuntu-24.04-purple)](https://ubuntu.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-> **Bài toán:** Robot service trong nhà kho / nhà máy cần hiểu lệnh tự nhiên của công nhân Việt Nam
-> ("đi tới thùng màu cam", "tìm hộp đỏ") và tự hành đến đúng vật thể — không cần lập trình waypoint thủ công.
+> **Problem:** A warehouse service robot needs to understand natural language commands
+> ("go to the orange box", "find the red box") and navigate autonomously to the correct object —
+> without manual waypoint programming.
 >
-> **Giải pháp:** Tích hợp Vision-Language Model (Qwen2.5-VL) chạy local trên GPU,
-> kết hợp LiDAR safety và camera obstacle detection, điều khiển robot hoàn toàn bằng ngôn ngữ tự nhiên tiếng Việt/English.
+> **Solution:** Integrate a Vision-Language Model (Qwen2.5-VL) running locally on GPU,
+> combined with LiDAR safety and camera obstacle detection,
+> enabling fully natural-language-controlled robot navigation.
 
 ---
 
 ## Demo
-
-<!-- 🎥 **[Video Demo](https://youtube.com/...)** — Xem robot nhận lệnh tiếng Việt và tự hành trong Gazebo -->
 
 ![Demo](docs/media/demo_v3.gif)
 
@@ -31,53 +31,53 @@
 
 ---
 
-## Điểm nổi bật
+## Highlights
 
-- **Natural Language Control** — gửi lệnh tiếng Việt/English: `"đi tới thùng màu cam"`, `"find the red box"`
-- **Vision-Language Model** — Qwen2.5-VL-3B-Instruct (INT4, ~2GB VRAM) chạy local, phân tích camera frame và sinh action plan JSON
-- **Dual-loop Architecture** — vòng lặp nhanh 50Hz (LiDAR safety + execution) song song VLM inference (~8s/frame) trên background thread
-- **State Machine 6 trạng thái** — IDLE → PLANNING → SEARCHING → APPROACHING → CONFIRMING → COMPLETED
-- **Camera Obstacle Detection** — phân tích bottom-frame để phát hiện vật cản thấp hơn tầm quét LIDAR
-- **Live Camera Feed** — camera sensor ogre2 + NVIDIA EGL, publish `/camera/image_raw` + `/camera/vlm_annotated`
-- **Expressive Robot** — đầu/tay phản ứng theo trạng thái VLM (vươn tay khi đến đích, nghiêng đầu khi tiếp cận)
-
----
-
-## Thách thức kỹ thuật & Cách giải quyết
-
-### 1. VLM inference quá chậm cho real-time control
-**Vấn đề:** Qwen2.5-VL mất ~8 giây mỗi frame — robot không thể đứng im chờ.
-
-**Giải pháp:** Thiết kế dual-loop architecture — fast loop 50Hz xử lý LiDAR safety và execute action plan, trong khi VLM chạy trên background thread. Robot vẫn reactive với vật cản trong khi chờ VLM inference.
-
-### 2. Camera sensor không render trong Gazebo headless
-**Vấn đề:** `gz sim -s` (server-only) không khởi tạo rendering engine → camera sensor không publish frame.
-
-**Giải pháp:** Chạy Gazebo với GUI (`headless:=false`) trên DISPLAY:1 (NVIDIA EGL, ogre2), không dùng Mesa/LIBGL_ALWAYS_SOFTWARE để tránh segfault với ogre2.
-
-### 3. LiDAR không phát hiện vật cản thấp
-**Vấn đề:** LiDAR 2D quét ở độ cao cố định (~0.26m), bỏ sót vật thể thấp hơn tầm quét.
-
-**Giải pháp:** Hạ LIDAR mount (`z=-0.05`, quét ở ~0.18m) + thêm camera obstacle detection phân tích vùng dưới frame (60–85%), so sánh màu sắc với floor sample và Canny edge density → state `CAM_AVOID`.
-
-### 4. Xử lý tiếng Việt trong VLM prompt
-**Vấn đề:** Các VLM phổ biến không xử lý tốt lệnh tiếng Việt có dấu.
-
-**Giải pháp:** Chọn Qwen2.5-VL vì hỗ trợ multilingual tốt, thiết kế prompt template song ngữ với structured JSON output để đảm bảo action plan luôn parseable.
-
-### 5. Robot bị kẹt ở góc tường
-**Vấn đề:** Logic tránh vật cản đơn giản khiến robot xoay tại chỗ ở góc hẹp, không thoát được.
-
-**Giải pháp:** Implement anti-stuck strategy: mở rộng front sector (±0.30→±0.50 rad), thêm diagonal sectors, reverse-before-turn (lùi 0.4s trước khi quay), corner escape heuristic với stuck detector qua odometry.
+- **Natural Language Control** — send commands in English: `"go to the orange box"`, `"find the red box"`
+- **Vision-Language Model** — Qwen2.5-VL-3B-Instruct (INT4, ~2GB VRAM) runs locally, analyzes camera frames and generates action plan JSON
+- **Dual-loop Architecture** — 50Hz fast loop (LiDAR safety + execution) runs in parallel with VLM inference (~5–8s/frame) on a background thread
+- **6-State Machine** — IDLE → PLANNING → SEARCHING → APPROACHING → CONFIRMING → COMPLETED
+- **Camera Obstacle Detection** — analyzes bottom-frame region to detect objects below LiDAR scan height
+- **Live Camera Feed** — ogre2 camera sensor + NVIDIA EGL, publishes `/camera/image_raw` + `/camera/vlm_annotated`
+- **Expressive Robot** — head and arms react to VLM state (wave on arrival, tilt head when approaching)
 
 ---
 
-## Kiến trúc hệ thống
+## Technical Challenges & Solutions
+
+### 1. VLM inference too slow for real-time control
+**Problem:** Qwen2.5-VL takes ~8 seconds per frame — robot cannot wait idle.
+
+**Solution:** Dual-loop architecture — 50Hz fast loop handles LiDAR safety and executes the current action plan, while VLM runs on a background thread. Robot stays reactive to obstacles while waiting for VLM inference.
+
+### 2. Camera sensor not rendering in headless Gazebo
+**Problem:** `gz sim -s` (server-only) does not initialize rendering engine → camera sensor publishes no frames.
+
+**Solution:** Run Gazebo with GUI (`headless:=false`) on DISPLAY:1 (NVIDIA EGL, ogre2). Avoids Mesa/LIBGL_ALWAYS_SOFTWARE which causes segfault with ogre2.
+
+### 3. LiDAR misses low obstacles
+**Problem:** 2D LiDAR scans at a fixed height (~0.26m), missing objects lower than the scan plane.
+
+**Solution:** Lower LiDAR mount (`z=-0.05`, scanning at ~0.18m) + add camera obstacle detection analyzing the bottom region of the frame (60–85%), comparing color against a floor sample and Canny edge density → triggers `CAM_AVOID` state.
+
+### 4. Robot stuck in corners
+**Problem:** Simple obstacle avoidance logic causes the robot to spin in place in tight corners.
+
+**Solution:** Anti-stuck strategy: wider front sector (±0.30→±0.50 rad), diagonal sectors, reverse-before-turn (back up 0.4s before turning), corner escape heuristic with odometry-based stuck detector.
+
+### 5. Stuck detection disabled during VLM navigation
+**Problem:** When `vlm_planner` drives the robot, `wander.py`'s stuck detector does not fire because it only tracks velocity commands it sent itself.
+
+**Solution:** Subscribe to `/diff_drive_base_controller/cmd_vel` to track velocity from any publisher. Use `max(wander_cmd, actual_cmd)` in stuck detection so it works regardless of which node is driving.
+
+---
+
+## System Architecture
 
 ```
-────────────────── Gazebo Harmonic (NVIDIA EGL, ogre2) ──────────────────
+──────────────── Gazebo Harmonic (NVIDIA EGL, ogre2) ────────────────
    Camera 15Hz          LiDAR 10Hz            IMU 100Hz
-────────┬───────────────────┬──────────────────────┬──────────────────────
+────────┬───────────────────┬──────────────────────┬─────────────────
         │    ros_gz_bridge  │                      │
    ─────▼─────         ─────▼─────           ──────▼──────
    /camera/     /scan             /imu
@@ -87,7 +87,7 @@
    │              vlm_planner.py  (background thread)          │
    │  Qwen2.5-VL-3B-Instruct INT4 — HuggingFace Transformers  │
    │                                                           │
-   │  /user_command ──→ [slow loop ~8s]                        │
+   │  /user_command ──→ [slow loop ~5-8s]                      │
    │    camera frame → VLM inference → action_plan JSON        │
    │                                                           │
    │  [fast loop 50Hz]                                         │
@@ -108,37 +108,36 @@
    ──────────────────────────────────────────────────────────
 ```
 
-### Luồng xử lý VLM
+### VLM Processing Flow
 
 ```
-User: "đi tới thùng màu cam"
+User: "go to the orange box"
     │
     ▼ /user_command
-vlm_planner nhận lệnh → state: PLANNING
+vlm_planner receives command → state: PLANNING
     │
     ▼ camera frame (640×480)
-Qwen2.5-VL-3B-Instruct inference (~8s)
+Qwen2.5-VL-3B-Instruct inference (~5-8s)
     │
     ▼ action_plan JSON
 {
-  "action": "turn_right",
-  "target": "thùng màu cam",
+  "target_found": true,
   "target_position": "right",
-  "linear_speed": 0.2,
-  "angular_speed": 0.4,
-  "message": "Phát hiện thùng cam bên phải, đang tiếp cận"
+  "target_distance": "medium",
+  "action": { "type": "turn_right", "speed": 0.0, "angular": -0.4 },
+  "status": "approaching"
 }
     │
     ▼ fast loop (50Hz)
-Execute action → /cmd_vel → robot di chuyển
+Execute action → /cmd_vel → robot moves
     │
     ▼ /camera/vlm_annotated
-Frame + state overlay + target indicator → RViz2
+Frame + state overlay + target circle → RViz2
 ```
 
 ---
 
-## Cấu trúc project
+## Project Structure
 
 ```
 walle3-vlm/
@@ -158,7 +157,6 @@ walle3-vlm/
     │   └── worlds/walle_arena.sdf      # Arena 8×8m, ogre2 render engine
     └── walle_demo/walle_demo/
         ├── vlm_planner.py              # VLM planning node (main AI node)
-        ├── vlm_perception.py           # Parallel scene understanding
         ├── vlm_utils.py                # VLM backend wrapper (Transformers / Ollama)
         ├── language_interface.py       # Terminal input → /user_command
         ├── wander.py                   # Reactive navigation + camera obstacle detect
@@ -168,17 +166,17 @@ walle3-vlm/
 
 ---
 
-## Cài đặt & Chạy
+## Setup & Run
 
-### Yêu cầu hệ thống
+### Requirements
 
-| Thành phần | Yêu cầu |
-|-----------|---------|
+| Component | Requirement |
+|-----------|-------------|
 | OS | Ubuntu 24.04 LTS |
 | ROS 2 | Jazzy |
 | Gazebo | Harmonic (gz-sim 8) |
-| GPU | NVIDIA (≥8GB VRAM khuyến nghị) |
-| VRAM | ~2GB (3B INT4) hoặc ~6GB (7B INT4) |
+| GPU | NVIDIA (≥8GB VRAM recommended) |
+| VRAM | ~2GB (3B INT4) or ~6GB (7B INT4) |
 | Python | 3.12+ |
 
 ### Quick Start
@@ -207,39 +205,38 @@ colcon build --symlink-install && source install/setup.bash
 bash ../run_walle.sh
 ```
 
-### Gửi lệnh cho robot
+### Send Commands to Robot
 
 ```bash
-# Qua terminal language_interface (tự động mở khi VLM stack chạy)
-[WallE] > đi tới thùng màu cam
+# Via language_interface terminal (opens automatically with VLM stack)
+[WallE] > go to the orange box
 [WallE] > find the red box
 
-# Hoặc publish trực tiếp
+# Or publish directly
 ros2 topic pub --once /user_command std_msgs/msg/String \
-  "{data: 'đi tới thùng màu cam'}"
+  "{data: 'go to the orange box'}"
 ```
 
-### Monitor
+### Monitor Topics
 
 ```bash
 ros2 topic echo /behavior_state        # IDLE / PLANNING / APPROACHING / ESCAPE ...
-ros2 topic echo /vlm/scene_description # VLM mô tả scene
 ros2 topic echo /vlm/action_plan       # action plan JSON
 ros2 topic hz /camera/image_raw        # camera rate (~13Hz)
 ```
 
 ---
 
-## Kết quả & Đánh giá
+## Results
 
-| Metric | Giá trị |
-|--------|---------|
-| VLM inference latency | ~8s/frame (3B INT4, RTX 3060 12GB) |
+| Metric | Value |
+|--------|-------|
+| VLM inference latency | ~5–8s/frame (3B INT4, RTX 3060 12GB) |
 | Fast-loop frequency | 50Hz (LiDAR safety + execution) |
 | Camera feed | ~13Hz (640×480, ogre2 + NVIDIA EGL) |
-| Obstacle avoidance | LiDAR (≥0.18m) + Camera (vật thấp hơn) |
-| Ngôn ngữ hỗ trợ | Tiếng Việt, English |
-| VRAM usage | ~2GB (3B INT4), Gazebo chiếm ~6.7GB |
+| Obstacle avoidance | LiDAR (≥0.18m) + Camera (low objects) |
+| Languages supported | English |
+| VRAM usage | ~2GB (3B INT4), Gazebo uses ~6.7GB |
 | Corner escape | Reverse 0.8–1.4s + turn 1.5–2.5s |
 
 ---
@@ -250,20 +247,21 @@ ros2 topic hz /camera/image_raw        # camera rate (~13Hz)
 - [x] ros2_control (diff_drive + head + arm controllers)
 - [x] LiDAR obstacle avoidance
 - [x] Qwen2.5-VL Vision-Language Model integration
-- [x] Natural language commands (Vietnamese/English)
+- [x] Natural language commands (English)
 - [x] Dual-loop VLM architecture (50Hz + background inference)
 - [x] Camera sensor enabled (ogre2 + NVIDIA EGL)
 - [x] VLM annotated camera feed (`/camera/vlm_annotated`)
 - [x] Camera-based low obstacle detection
 - [x] LIDAR mount optimized (z=-0.05, ~0.18m from ground)
 - [x] Anti-stuck: wider sectors, reverse-before-turn, corner escape
+- [x] Stuck detection works during VLM navigation
 - [ ] Voice input (speech-to-text → `/user_command`)
-- [ ] Sim-to-real transfer (khi có hardware robot thật)
+- [ ] Sim-to-real transfer (physical robot hardware)
 - [ ] Edge deployment (Jetson Orin Nano)
 
 ---
 
-## Công nghệ sử dụng
+## Technologies
 
 **Robotics:** ROS 2 Jazzy · Gazebo Harmonic · URDF/Xacro · ros2_control · ros_gz_bridge
 
@@ -275,15 +273,8 @@ ros2 topic hz /camera/image_raw        # camera rate (~13Hz)
 
 ---
 
-## Tác giả
+## Author
 
-**Cong Thai** — Robotics & AI Developer · VinUniversity
-
-<!-- - 📧 Email: your.email@vinuni.edu.vn -->
-<!-- - 💼 LinkedIn: [linkedin.com/in/yourprofile](https://linkedin.com/in/yourprofile) -->
+**Cong Thai** — Robotics & AI Developer
 
 ---
-
-## License
-
-MIT License — xem file [LICENSE](LICENSE) để biết chi tiết.

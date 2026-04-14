@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""VLM Planner — bộ não VLM của WallE3 v2.
+"""VLM Planner — AI brain of WallE3 v2.
 
 Dual-loop architecture:
-  Fast loop  (50 Hz): thực thi plan hiện tại + LiDAR safety override
-  Slow loop  (~0.5 Hz): VLM inference trong background thread
+  Fast loop  (50 Hz): execute current plan + LiDAR safety override
+  Slow loop  (~0.2 Hz): VLM inference in background thread
 
 State machine: IDLE → PLANNING → SEARCHING → APPROACHING → CONFIRMING → COMPLETED
 

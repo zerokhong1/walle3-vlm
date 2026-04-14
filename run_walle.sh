@@ -1,6 +1,6 @@
 #!/bin/bash
 # WallE3 v2 — One-command startup
-# Chạy Gazebo trực tiếp trên DISPLAY:1 (NVIDIA GPU) để camera sensor hoạt động
+# Run Gazebo directly on DISPLAY:1 (NVIDIA GPU) so camera sensor works
 # Camera → VLM inference → robot navigation
 
 set -e
@@ -33,9 +33,9 @@ rm -f /tmp/.X99-lock /tmp/.X11-unix/X99 2>/dev/null || true
 source /opt/ros/jazzy/setup.bash
 source $WS/install/setup.bash
 
-# ── 1. Gazebo simulation + AI nodes — DISPLAY:1 với NVIDIA GPU ────────────────
+# ── 1. Gazebo simulation + AI nodes — DISPLAY:1 with NVIDIA GPU ──────────────
 echo ">>> [1/3] Starting Gazebo simulation + AI nodes (NVIDIA GPU, camera enabled)..."
-echo "    headless:=false  →  Gazebo GUI + camera sensor rendering hoạt động"
+echo "    headless:=false  →  Gazebo GUI + camera sensor rendering active"
 
 DISPLAY=$REAL_DISPLAY \
 XAUTHORITY=$XAUTHORITY_PATH \
@@ -49,7 +49,7 @@ ros2 launch walle_bringup sim.launch.py \
 SIM_PID=$!
 echo "    Simulation PID=$SIM_PID"
 
-# ── Chờ Gazebo + controllers khởi động ───────────────────────────────────────
+# ── Wait for Gazebo + controllers to start ───────────────────────────────────
 echo "    Waiting 25s for Gazebo + controllers..."
 sleep 25
 grep -q "diff_drive_base_controller" /tmp/walle_server.log \
@@ -70,7 +70,7 @@ RVIZ_PID=$!
 echo "    RViz2 PID=$RVIZ_PID"
 
 # ── 3. VLM Stack ─────────────────────────────────────────────────────────────
-echo ">>> [3/3] Starting VLM stack (Qwen2.5-VL, đang load model ~20s)..."
+echo ">>> [3/3] Starting VLM stack (Qwen2.5-VL, loading model ~20s)..."
 DISPLAY=$REAL_DISPLAY \
 XAUTHORITY=$XAUTHORITY_PATH \
 ros2 launch walle_bringup vlm.launch.py \
@@ -80,34 +80,26 @@ ros2 launch walle_bringup vlm.launch.py \
 VLM_PID=$!
 echo "    VLM PID=$VLM_PID"
 
-# ── Xác nhận cửa sổ ──────────────────────────────────────────────────────────
+# ── Confirm windows open ─────────────────────────────────────────────────────
 sleep 8
 echo ""
 echo "============================================"
 echo "  WallE3 v2 is running!"
-echo ""
-echo "  Cửa sổ trên màn hình:"
-DISPLAY=$REAL_DISPLAY xwininfo -root -tree 2>/dev/null \
-  | grep "mutter-x11-frames" | grep -v '"": ' \
-  | grep -E "(RViz|Gazebo)" \
-  | awk '{printf "    %s\n", $0}' \
-  || echo "    (Alt+Tab để xem cửa sổ)"
 echo ""
 echo "  Camera topics:"
 echo "    /camera/image_raw      — live robot camera"
 echo "    /camera/vlm_annotated  — camera + VLM overlay"
 echo ""
 echo "  VLM topics:"
-echo "    /user_command          — gửi lệnh cho robot"
-echo "    /vlm/scene_description — VLM mô tả scene"
+echo "    /user_command          — send commands to robot"
 echo "    /vlm/action_plan       — action plan JSON"
-echo "    /behavior_state        — trạng thái robot"
+echo "    /behavior_state        — robot state"
 echo ""
-echo "  Ví dụ lệnh:"
+echo "  Example command:"
 echo "    ros2 topic pub --once /user_command std_msgs/msg/String \\"
-echo "      \"{data: 'đi tới thùng màu cam'}\""
+echo "      \"{data: 'go to the orange box'}\""
 echo ""
-echo "  Dừng: Ctrl+C"
+echo "  Stop: Ctrl+C"
 echo "============================================"
 
 wait

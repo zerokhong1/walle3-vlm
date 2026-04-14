@@ -39,27 +39,28 @@ Quy tắc phản hồi:
 SYSTEM_PROMPT_EN = """You are the AI brain of a mobile WALL-E robot.
 The robot has:
 - A front-facing camera (you see images from this camera)
-- 360° LiDAR (automatic safety layer — no need to worry about it)
-- Differential drive: forward/back/turn left/right
+- LiDAR safety layer (handled automatically — ignore it)
+- Differential drive: go_forward / turn_left / turn_right / stop / search
 - 2-DOF head: yaw ±0.65 rad, pitch ±0.5 rad
 - 2 arms: raise/lower ±1.0 rad
 
-Response rules:
-1. Always reply with valid JSON — no extra explanation
-2. If target not visible → action.type = "search"
-3. Target on left → turn_left, head_yaw > 0
-4. Target on right → turn_right, head_yaw < 0
-5. Target centered and close → stop
-6. Max linear speed = 0.25 m/s, max angular = 0.8 rad/s
-7. Describe scene briefly"""
+Rules:
+1. Always reply with valid JSON only — no extra text or explanation
+2. If target not visible → action.type = "search", turn slowly to look around
+3. Target on left → turn_left (angular > 0)
+4. Target on right → turn_right (angular < 0)
+5. Target centered and close (near) → stop, status = "reached"
+6. Target centered but far/medium → go_forward, status = "approaching"
+7. Max linear speed = 0.25 m/s, max angular = 0.6 rad/s
+8. scene: describe briefly in English what you see"""
 
 ACTION_PROMPT_TEMPLATE = """{system}
 
-Nhiệm vụ: {command}
+Task: {command}
 
-Nhìn ảnh camera và trả lời JSON:
+Look at the camera image and reply with JSON only:
 {{
-  "scene": "<mô tả ngắn những gì thấy trong ảnh>",
+  "scene": "<brief description of what you see>",
   "target_found": true/false,
   "target_position": "left/center/right/unknown",
   "target_distance": "near/medium/far/unknown",
@@ -74,19 +75,19 @@ Nhìn ảnh camera và trả lời JSON:
     "duration_sec": 1.0
   }},
   "status": "searching/approaching/reached/not_found",
-  "message": "<thông báo ngắn cho user>"
+  "message": "<short status message>"
 }}
-Chỉ trả lời JSON, không giải thích."""
+Reply with JSON only, no explanation."""
 
-SCENE_PROMPT = """Mô tả ngắn gọn những gì thấy trong ảnh camera của robot.
-Trả lời JSON:
+SCENE_PROMPT = """Briefly describe what you see in the robot camera image.
+Reply with JSON only:
 {
-  "scene": "<mô tả tiếng Việt, tối đa 2 câu>",
-  "objects": ["<vật 1>", "<vật 2>", ...],
-  "obstacles": "<mô tả vật cản nếu có, hoặc 'không có'>",
+  "scene": "<description in 1-2 sentences>",
+  "objects": ["<object 1>", "<object 2>", ...],
+  "obstacles": "<describe obstacles ahead, or 'none'>",
   "lighting": "bright/normal/dark"
 }
-Chỉ trả lời JSON."""
+Reply with JSON only."""
 
 
 # ── JSON extraction ───────────────────────────────────────────────────────────
@@ -114,7 +115,7 @@ def extract_json(text: str) -> Optional[Dict[str, Any]]:
 def make_default_plan(command: str = "", status: str = "searching") -> Dict[str, Any]:
     """Return a safe default plan when VLM fails or times out."""
     return {
-        "scene": "Không xác định được scene",
+        "scene": "Scene unknown",
         "target_found": False,
         "target_position": "unknown",
         "target_distance": "unknown",
@@ -129,7 +130,7 @@ def make_default_plan(command: str = "", status: str = "searching") -> Dict[str,
             "duration_sec": 1.0,
         },
         "status": status,
-        "message": f"Đang tìm kiếm: {command}",
+        "message": f"Searching for: {command}",
     }
 
 
