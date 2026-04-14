@@ -388,46 +388,71 @@ class VLMPlanner(Node):
         }
         color = STATE_COLORS.get(state, (200, 200, 200))
 
-        # Top bar: state + command
+        # Top bar: state only (no scene — scene text is Vietnamese, garbles on cv2)
         cv2.rectangle(canvas, (0, 0), (w, 36), (20, 20, 20), -1)
         cv2.rectangle(canvas, (0, 0), (6, 36), color, -1)
         state_label = f'[VLM] {state}'
         cv2.putText(canvas, state_label, (14, 24),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2, cv2.LINE_AA)
 
-        # Scene description
-        scene = plan.get('scene', '')[:70]
-        if scene:
-            cv2.rectangle(canvas, (0, 36), (w, 62), (30, 30, 30), -1)
-            cv2.putText(canvas, scene, (8, 54),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 255, 200), 1, cv2.LINE_AA)
-
         # Target indicator
         target_found = plan.get('target_found', False)
         target_pos   = plan.get('target_position', 'unknown')
+        target_dist  = plan.get('target_distance', 'unknown')
+
         if target_found:
-            pos_x = {'left': w // 4, 'center': w // 2, 'right': 3 * w // 4}.get(target_pos, w // 2)
-            cv2.circle(canvas, (pos_x, h // 2), 30, (0, 255, 100), 3)
-            cv2.putText(canvas, 'TARGET', (pos_x - 28, h // 2 + 50),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 100), 2, cv2.LINE_AA)
-            # Direction arrow
-            arrow_dx = {'left': -60, 'center': 0, 'right': 60}.get(target_pos, 0)
-            cv2.arrowedLine(canvas, (w // 2, h - 50), (w // 2 + arrow_dx, h - 90),
+            # Horizontal position: left 1/4, center 1/2, right 3/4
+            pos_x = {'left': w // 4, 'center': w // 2, 'right': 3 * w // 4}.get(
+                target_pos, w // 2)
+
+            # Vertical position: far objects appear high, near objects appear low
+            # Exclude top bar (36px) and bottom bar (50px) from usable area
+            usable_top = 36
+            usable_bot = h - 50
+            usable_h   = usable_bot - usable_top
+            pos_y = {
+                'far':     usable_top + usable_h // 4,       # upper quarter
+                'medium':  usable_top + usable_h // 2,       # middle
+                'near':    usable_top + 3 * usable_h // 4,   # lower quarter
+            }.get(target_dist, usable_top + usable_h // 2)
+
+            # Circle radius scales with apparent size: near=large, far=small
+            radius = {'near': 55, 'medium': 38, 'far': 22}.get(target_dist, 38)
+
+            # Draw target circle with crosshair
+            cv2.circle(canvas, (pos_x, pos_y), radius, (0, 255, 100), 3)
+            cv2.line(canvas, (pos_x - radius, pos_y), (pos_x + radius, pos_y),
+                     (0, 255, 100), 1)
+            cv2.line(canvas, (pos_x, pos_y - radius), (pos_x, pos_y + radius),
+                     (0, 255, 100), 1)
+
+            # Label below circle (ensure it stays inside frame)
+            label_y = min(pos_y + radius + 18, h - 55)
+            cv2.putText(canvas, f'TARGET ({target_dist})', (pos_x - 50, label_y),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 100), 2, cv2.LINE_AA)
+
+            # Direction arrow at bottom pointing toward target
+            arrow_dx = {'left': -70, 'center': 0, 'right': 70}.get(target_pos, 0)
+            cv2.arrowedLine(canvas, (w // 2, h - 55), (w // 2 + arrow_dx, h - 90),
                             (0, 255, 100), 3, tipLength=0.4)
 
-        # Bottom bar: action
+        # Bottom bar: action + status (ASCII only — no message field, it's Vietnamese)
         action = plan.get('action', {})
         a_type  = action.get('type', '')
         speed   = action.get('speed', 0.0)
         angular = action.get('angular', 0.0)
         status  = plan.get('status', '')
-        msg     = plan.get('message', '')[:50]
 
         cv2.rectangle(canvas, (0, h - 50), (w, h), (20, 20, 20), -1)
         action_str = f'action: {a_type}  speed: {speed:.2f} m/s  angular: {angular:.2f} rad/s'
         cv2.putText(canvas, action_str, (8, h - 28),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.44, (200, 200, 255), 1, cv2.LINE_AA)
-        cv2.putText(canvas, msg, (8, h - 10),
+        # Show target position/distance instead of Vietnamese message
+        if target_found:
+            info_str = f'target: {target_pos}  dist: {target_dist}  status: {status}'
+        else:
+            info_str = f'status: {status}  target: not found'
+        cv2.putText(canvas, info_str, (8, h - 10),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.40, (180, 180, 180), 1, cv2.LINE_AA)
 
         return canvas
