@@ -19,7 +19,7 @@
 
 <!-- 🎥 **[Video Demo](https://youtube.com/...)** — Xem robot nhận lệnh tiếng Việt và tự hành trong Gazebo -->
 
-![Demo](docs/media/demo_v2.gif)
+![Demo](docs/media/demo_v3.gif)
 
 | Gazebo — Arena Simulation | RViz2 — Robot + LiDAR |
 |:-------------------------:|:---------------------:|
