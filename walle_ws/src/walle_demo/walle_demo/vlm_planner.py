@@ -298,6 +298,13 @@ class VLMPlanner(Node):
         # Safety clamp — speed AND angular
         speed   = max(0.0,            min(speed,   self._max_speed))
         angular = max(-_MAX_ANGULAR,  min(angular, _MAX_ANGULAR))
+
+        # When searching (target not found), drive a slow rotation scan
+        # so the robot actively scans the environment instead of stopping
+        if a_type == 'search' and not plan.get('target_found', False):
+            speed   = 0.0
+            angular = 0.30   # slow in-place rotation to scan surroundings
+
         if front_min < OBSTACLE_SLOW_DIST:
             speed *= 0.4
 
@@ -317,7 +324,7 @@ class VLMPlanner(Node):
             self._state = 'CONFIRMING'
         elif status == 'approaching':
             self._state = 'APPROACHING'
-        elif status == 'not_found':
+        elif status in ('searching', 'not_found'):
             self._state = 'SEARCHING'
 
         # Publish plan + state
