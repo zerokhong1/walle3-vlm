@@ -50,15 +50,15 @@ IMAGE_WIDTH  = 640.0
 IMAGE_CENTER = IMAGE_WIDTH / 2.0
 DETECTION_TIMEOUT = 2.5
 
-# Camera obstacle thresholds
-_CAM_COLOR_DIFF_THRESH  = 28.0
-_CAM_EDGE_DENSITY_THRESH = 0.06
+# Camera obstacle thresholds (lowered for better small-object detection)
+_CAM_COLOR_DIFF_THRESH  = 18.0   # was 28.0 — more sensitive
+_CAM_EDGE_DENSITY_THRESH = 0.04  # was 0.06 — more sensitive
 _CAM_FRAME_MAX_AGE       = 1.2
 
 # Stuck detection
-_STUCK_CMD_THRESH   = 0.05   # m/s — minimum cmd to count as "moving command"
-_STUCK_VEL_THRESH   = 0.02   # m/s — maximum actual speed to count as "not moving"
-_STUCK_TIMEOUT_SEC  = 2.5    # seconds before declaring stuck
+_STUCK_CMD_THRESH   = 0.04   # m/s — minimum cmd to count as "moving command"
+_STUCK_VEL_THRESH   = 0.03   # m/s — maximum actual speed to count as "not moving"
+_STUCK_TIMEOUT_SEC  = 2.0    # seconds before declaring stuck (was 2.5)
 
 
 @dataclass
@@ -112,10 +112,10 @@ class ReactiveWander(Node):
         self.cmd_pub   = self.create_publisher(TwistStamped, cmd_topic, 10)
         self.state_pub = self.create_publisher(String, '/behavior_state', 10)
 
-        self.create_subscription(LaserScan, scan_topic,           self._scan_cb,      be_qos)
-        self.create_subscription(ImageMsg,  '/camera/image_raw',  self._image_cb,     img_qos)
-        self.create_subscription(Odometry,  '/diff_drive_base_controller/odom',
-                                 self._odom_cb, be_qos)
+        self.create_subscription(LaserScan,    scan_topic,                              self._scan_cb,      be_qos)
+        self.create_subscription(ImageMsg,     '/camera/image_raw',                     self._image_cb,     img_qos)
+        self.create_subscription(Odometry,     '/diff_drive_base_controller/odom',      self._odom_cb,      be_qos)
+        self.create_subscription(TwistStamped, '/diff_drive_base_controller/cmd_vel',   self._cmdvel_cb,    be_qos)
         self.create_subscription(String, '/detections',      self._detection_cb, 10)
         self.create_subscription(String, '/vlm/detections',  self._detection_cb, 10)
         self.create_subscription(String, '/vlm/action_plan', self._vlm_plan_cb,  10)
@@ -146,7 +146,8 @@ class ReactiveWander(Node):
 
         # ── Stuck detection ─────────────────────────────────────────────────
         self._odom_vx: float        = 0.0
-        self._cmd_vx:  float        = 0.0
+        self._cmd_vx:  float        = 0.0    # velocity wander commands
+        self._actual_cmd_vx: float  = 0.0    # velocity from ANY publisher (incl. vlm_planner)
         self._stuck_since: Optional[Time] = None
         self._escaping: bool        = False  # True while in escape maneuver
 
@@ -169,6 +170,10 @@ class ReactiveWander(Node):
         vx = msg.twist.twist.linear.x
         vy = msg.twist.twist.linear.y
         self._odom_vx = math.sqrt(vx * vx + vy * vy)
+
+    def _cmdvel_cb(self, msg: TwistStamped) -> None:
+        """Track actual commanded velocity from ANY publisher (wander OR vlm_planner)."""
+        self._actual_cmd_vx = abs(msg.twist.linear.x)
 
     def _image_cb(self, msg: ImageMsg) -> None:
         try:
@@ -253,9 +258,13 @@ class ReactiveWander(Node):
     # ── Stuck detection ───────────────────────────────────────────────────────
 
     def _update_stuck(self, now: Time) -> bool:
-        """Return True if robot is currently stuck (commanded forward but not moving)."""
-        # Only check stuck when commanding forward motion
-        if self._cmd_vx < _STUCK_CMD_THRESH:
+        """Return True if robot is stuck.
+
+        Uses _actual_cmd_vx (tracks ANY publisher incl. vlm_planner) so stuck
+        detection works even when VLM is driving.
+        """
+        effective_cmd = max(self._cmd_vx, self._actual_cmd_vx)
+        if effective_cmd < _STUCK_CMD_THRESH:
             self._stuck_since = None
             return False
 
@@ -280,9 +289,18 @@ class ReactiveWander(Node):
         if self._vlm_active:
             if now < self._vlm_timeout:
                 self._cmd_vx = 0.0
-                self._pub_state('VLM_TASK')
-                return
-            self._vlm_active = False
+                # Still run stuck detection — vlm_planner may have us moving into obstacle
+                if self._update_stuck(now):
+                    self._stuck_since = None
+                    self._vlm_active  = False   # override VLM, escape takes priority
+                    self.get_logger().warn('[VLM_TASK] STUCK detected — overriding VLM, escaping')
+                    self._trigger_escape(now)
+                    # Fall through to execute escape below
+                else:
+                    self._pub_state('VLM_TASK')
+                    return
+            else:
+                self._vlm_active = False
 
         # ── Priority 1: ATTENTION ────────────────────────────────────────────
         if self.person_hit is not None:
