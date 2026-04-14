@@ -58,15 +58,63 @@ OBSTACLE_SLOW_DIST  = 0.60   # m — slow down
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "model_backend":       "transformers",
-    "model_name":          "Qwen/Qwen2.5-VL-7B-Instruct",
+    "model_name":          "Qwen/Qwen2.5-VL-3B-Instruct",
     "quantize_4bit":       True,
-    "language":            "vi",
-    "inference_interval_sec": 2.0,
-    "vlm_timeout_sec":     10.0,
-    "fallback_to_yolo":    True,
+    "language":            "en",
+    "inference_interval_sec": 5.0,
+    "vlm_timeout_sec":     12.0,
+    "fallback_to_yolo":    False,
     "max_speed":           0.25,
-    "angular_max":         0.80,
+    "angular_max":         0.60,
 }
+
+# ── VLM output validation ─────────────────────────────────────────────────────
+_VALID_ACTION_TYPES = {'go_forward', 'turn_left', 'turn_right', 'stop', 'search', 'reverse'}
+_VALID_POSITIONS    = {'left', 'center', 'right', 'unknown'}
+_VALID_DISTANCES    = {'near', 'medium', 'far', 'unknown'}
+_VALID_STATUSES     = {'searching', 'approaching', 'reached', 'not_found'}
+_MAX_ANGULAR        = 0.60
+_MAX_SPEED          = 0.25
+
+
+def _validate_plan(plan: Dict[str, Any]) -> Dict[str, Any]:
+    """Clamp and validate VLM output to prevent hallucinated values."""
+    action = plan.get('action') or {}
+    if not isinstance(action, dict):
+        action = {}
+
+    # Validate action type
+    if action.get('type') not in _VALID_ACTION_TYPES:
+        action['type'] = 'stop'
+
+    # Clamp speed and angular
+    try:
+        speed = float(action.get('speed', 0.0))
+    except (TypeError, ValueError):
+        speed = 0.0
+    try:
+        angular = float(action.get('angular', 0.0))
+    except (TypeError, ValueError):
+        angular = 0.0
+    import math as _math
+    if not _math.isfinite(speed):
+        speed = 0.0
+    if not _math.isfinite(angular):
+        angular = 0.0
+    action['speed']   = max(0.0,         min(speed,   _MAX_SPEED))
+    action['angular'] = max(-_MAX_ANGULAR, min(angular, _MAX_ANGULAR))
+    plan['action'] = action
+
+    # Validate categorical fields
+    if plan.get('target_position') not in _VALID_POSITIONS:
+        plan['target_position'] = 'unknown'
+    if plan.get('target_distance') not in _VALID_DISTANCES:
+        plan['target_distance'] = 'unknown'
+    if plan.get('status') not in _VALID_STATUSES:
+        plan['status'] = 'searching'
+    if not isinstance(plan.get('target_found'), bool):
+        plan['target_found'] = False
+    return plan
 
 
 @dataclass
@@ -142,13 +190,18 @@ class VLMPlanner(Node):
 
         self._vlm: Any     = None      # VLMInterface, loaded in thread
         self._vlm_ready    = False
+        self._state_lock   = threading.Lock()   # protects _state, _command
 
         # Search rotation bookkeeping
         self._search_angle_covered = 0.0
         self._last_search_t        = time.monotonic()
 
         # Slow-loop timing
-        self._last_infer_t = 0.0
+        self._last_infer_t  = 0.0
+        self._last_vlm_ok_t = time.monotonic()   # watchdog: last successful VLM inference
+
+        # Temporal filtering: smooth target_position decisions (majority vote, window=3)
+        self._pos_history: List[str] = []
 
         # ── Timers ──────────────────────────────────────────────────────────
         self.fast_timer = self.create_timer(0.02, self._fast_loop)      # 50 Hz
@@ -200,9 +253,11 @@ class VLMPlanner(Node):
         if not cmd:
             return
         self.get_logger().info(f'[VLM] Command received: "{cmd}"')
-        self._command = cmd
-        self._state   = 'PLANNING'
+        with self._state_lock:
+            self._command = cmd
+            self._state   = 'PLANNING'
         self._last_infer_t = 0.0   # trigger immediate inference
+        self._pos_history.clear()  # reset temporal filter for new task
 
     # ── Fast loop: 50 Hz ──────────────────────────────────────────────────────
 
@@ -240,8 +295,9 @@ class VLMPlanner(Node):
         speed   = float(action.get('speed', 0.0))
         angular = float(action.get('angular', 0.0))
 
-        # Safety clamp
-        speed = min(speed, self._max_speed)
+        # Safety clamp — speed AND angular
+        speed   = max(0.0,            min(speed,   self._max_speed))
+        angular = max(-_MAX_ANGULAR,  min(angular, _MAX_ANGULAR))
         if front_min < OBSTACLE_SLOW_DIST:
             speed *= 0.4
 
@@ -282,8 +338,8 @@ class VLMPlanner(Node):
                 ann_msg = self._bridge.cv2_to_imgmsg(annotated, 'bgr8')
                 ann_msg.header.stamp = self.get_clock().now().to_msg()
                 self.ann_pub.publish(ann_msg)
-            except Exception:
-                pass
+            except Exception as e:
+                self.get_logger().warn(f'[VLM] Annotated frame publish failed: {e}')
 
         # Confirmation transition
         if self._state == 'CONFIRMING':
@@ -293,14 +349,23 @@ class VLMPlanner(Node):
     # ── Slow loop: VLM inference (background thread) ──────────────────────────
 
     def _vlm_loop(self) -> None:
+        VLM_WATCHDOG_SEC = 30.0   # if no successful inference for 30s, warn
         while rclpy.ok():
             time.sleep(0.1)
-            if not self._vlm_ready or self._state == 'IDLE':
+
+            with self._state_lock:
+                state   = self._state
+                command = self._command
+            if not self._vlm_ready or state == 'IDLE':
                 continue
 
             now = time.monotonic()
             if now - self._last_infer_t < self._infer_interval:
                 continue
+
+            # Watchdog check
+            if now - self._last_vlm_ok_t > VLM_WATCHDOG_SEC:
+                self.get_logger().warn('[VLM] No successful inference for >30s — model may be hung')
 
             with self._frame_lock:
                 frame = self._latest_frame.copy() if self._latest_frame is not None else None
@@ -310,9 +375,34 @@ class VLMPlanner(Node):
 
             self._last_infer_t = now
 
-            plan = self._vlm.plan(frame, self._command)
+            try:
+                plan = self._vlm.plan(frame, command)
+            except Exception as e:
+                self.get_logger().error(f'[VLM] Inference exception: {e}')
+                continue
+
+            # Validate and clamp VLM output
+            plan = _validate_plan(plan)
+
+            # Temporal filtering: smooth target_position with majority vote (window=3)
+            pos = plan.get('target_position', 'unknown')
+            self._pos_history.append(pos)
+            if len(self._pos_history) > 3:
+                self._pos_history.pop(0)
+            if len(self._pos_history) == 3:
+                from collections import Counter
+                majority = Counter(self._pos_history).most_common(1)[0][0]
+                plan['target_position'] = majority
+
             with self._plan_lock:
                 self._plan = plan
+            self._last_vlm_ok_t = now
+            self.get_logger().info(
+                f'[VLM] plan: action={plan.get("action",{}).get("type")} '
+                f'target_found={plan.get("target_found")} '
+                f'pos={plan.get("target_position")} dist={plan.get("target_distance")} '
+                f'status={plan.get("status")}'
+            )
 
     # ── LiDAR helpers ─────────────────────────────────────────────────────────
 

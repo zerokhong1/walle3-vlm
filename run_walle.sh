@@ -6,9 +6,11 @@
 set -e
 
 REAL_DISPLAY=:1
-XAUTHORITY_PATH=/run/user/1000/gdm/Xauthority
+XAUTHORITY_PATH="/run/user/$(id -u)/gdm/Xauthority"
 LD_FIX=/lib/x86_64-linux-gnu/libpthread.so.0
-WS=/home/thailuu/VinUni_proj/walle_ws
+# Derive workspace from the location of this script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WS="$SCRIPT_DIR/walle_ws"
 
 echo "============================================"
 echo "  WallE3 v2 — VLM-Powered Autonomous Robot"
@@ -64,7 +66,7 @@ LD_PRELOAD=$LD_FIX \
 LIBGL_ALWAYS_SOFTWARE=1 \
 GALLIUM_DRIVER=llvmpipe \
 ros2 run rviz2 rviz2 \
-  -d /home/thailuu/VinUni_proj/walle.rviz \
+  -d "$SCRIPT_DIR/walle.rviz" \
   > /tmp/rviz2.log 2>&1 &
 RVIZ_PID=$!
 echo "    RViz2 PID=$RVIZ_PID"

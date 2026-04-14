@@ -335,9 +335,9 @@ class VLMInterface:
         if not self.ready or self.backend is None:
             return make_default_plan(command, "not_found")
 
-        prompt = ACTION_PROMPT_TEMPLATE.format(
-            system=self.system_prompt, command=command
-        )
+        # ACTION_PROMPT_TEMPLATE no longer embeds {system} — system is passed
+        # separately to the model's system role (not duplicated in user message)
+        prompt = ACTION_PROMPT_TEMPLATE.format(system='', command=command).lstrip()
         try:
             t0 = time.monotonic()
             raw = self.backend.infer(frame, prompt, system=self.system_prompt)

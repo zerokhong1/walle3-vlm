@@ -25,3 +25,10 @@ __pycache__/
 # IDE
 .vscode/
 .idea/
+
+# ML model weights (use download scripts instead)
+*.pt
+*.pth
+*.onnx
+*.bin
+*.safetensors

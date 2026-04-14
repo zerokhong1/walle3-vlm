@@ -12,10 +12,10 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='OpenAI',
-    maintainer_email='opensource@openai.com',
+    maintainer='Cong Thai',
+    maintainer_email='sunshinforwho@gmail.com',
     description='Autonomy and expressive behavior nodes for the WALL-E inspired robot.',
-    license='Apache-2.0',
+    license='MIT',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [

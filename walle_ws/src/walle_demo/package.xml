@@ -3,8 +3,8 @@
   <name>walle_demo</name>
   <version>0.1.0</version>
   <description>Autonomy and expressive behavior nodes for the WALL-E inspired Gazebo simulation.</description>
-  <maintainer email="opensource@openai.com">OpenAI</maintainer>
-  <license>Apache-2.0</license>
+  <maintainer email="conghthai@gmail.com">Cong Thai</maintainer>
+  <license>MIT</license>
 
   <buildtool_depend>ament_python</buildtool_depend>
 

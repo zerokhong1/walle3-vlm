@@ -3,8 +3,8 @@
   <name>walle_description</name>
   <version>0.1.0</version>
   <description>WALL-E inspired robot description package for ROS 2 Jazzy and Gazebo Harmonic.</description>
-  <maintainer email="opensource@openai.com">OpenAI</maintainer>
-  <license>Apache-2.0</license>
+  <maintainer email="conghthai@gmail.com">Cong Thai</maintainer>
+  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

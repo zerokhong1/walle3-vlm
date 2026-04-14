@@ -93,7 +93,6 @@ class ExpressiveMotion(Node):
     def _vlm_plan_cb(self, msg: String) -> None:
         """React to VLM action plan — override arm/head for VLM states."""
         try:
-            import json
             plan = json.loads(msg.data)
         except Exception:
             return

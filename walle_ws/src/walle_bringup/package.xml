@@ -3,8 +3,8 @@
   <name>walle_bringup</name>
   <version>0.1.0</version>
   <description>Bringup, controllers, bridge, and Gazebo world for the WALL-E inspired simulation.</description>
-  <maintainer email="opensource@openai.com">OpenAI</maintainer>
-  <license>Apache-2.0</license>
+  <maintainer email="conghthai@gmail.com">Cong Thai</maintainer>
+  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

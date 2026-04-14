@@ -1,0 +1,27 @@
+# WallE3 v2 — Python dependencies
+# Install with: pip install -r requirements.txt --break-system-packages
+
+# Vision-Language Model
+transformers>=4.45.0
+accelerate>=0.26.0
+bitsandbytes>=0.43.0
+qwen-vl-utils>=0.0.8
+
+# PyTorch (CUDA 12.x)
+torch>=2.1.0
+torchvision>=0.16.0
+
+# Computer Vision
+opencv-python>=4.9.0
+"numpy<2.0"
+Pillow>=10.0.0
+
+# ROS 2 bridge (installed via apt, listed for reference)
+# ros-jazzy-cv-bridge
+# ros-jazzy-image-transport
+
+# Optional: YOLOv8 fallback
+# ultralytics>=8.0.0
+
+# Optional: Ollama backend
+# ollama>=0.1.0

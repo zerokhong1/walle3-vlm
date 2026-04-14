@@ -456,7 +456,8 @@ class ReactiveWander(Node):
 
     def _sector_min(self, angle_start: float, angle_end: float) -> float:
         state = self.scan_state
-        assert state is not None
+        if state is None:
+            return float('inf')
         if not state.ranges:
             return state.range_max
         i0 = int((angle_start - state.angle_min) / state.angle_increment)
