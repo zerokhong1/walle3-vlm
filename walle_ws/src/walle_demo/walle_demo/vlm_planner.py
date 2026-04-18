@@ -9,13 +9,18 @@ State machine: IDLE → PLANNING → SEARCHING → APPROACHING → CONFIRMING �
 
 Subscribe:
   /camera/image_raw          — camera feed
-  /user_command              — lệnh từ user (text)
+  /user_command              — lenh tu user (text)
   /scan                      — LiDAR (safety layer)
 
-Publish:
+Publish (contract v1.0):
+  /planner/state             — mission lifecycle state (IDLE|PLANNING|SEARCHING|APPROACHING|CONFIRMING|COMPLETED)
+  /controller/mode           — EMERGENCY_STOP khi LiDAR phat hien nguy hiem cap thiet
   /vlm/action_plan           — JSON action plan
-  /vlm/scene_description     — mô tả scene
-  /behavior_state            — state machine state
+  /vlm/scene_description     — mo ta scene
+  /mission/started           — su kien bat dau mission
+  /mission/completed         — su kien ket thuc mission
+  /safety/event              — su kien an toan (collision_risk)
+  /inference/event           — thong ke suy luan VLM
   /diff_drive_base_controller/cmd_vel
 """
 
@@ -25,6 +30,7 @@ import json
 import math
 import threading
 import time
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -160,16 +166,22 @@ class VLMPlanner(Node):
         )
 
         # ── Publishers ──────────────────────────────────────────────────────
-        self.cmd_pub   = self.create_publisher(
+        self.cmd_pub            = self.create_publisher(
             TwistStamped, '/diff_drive_base_controller/cmd_vel', 10)
-        self.state_pub = self.create_publisher(String, '/behavior_state', 10)
-        self.plan_pub  = self.create_publisher(String, '/vlm/action_plan', 10)
-        self.scene_pub = self.create_publisher(String, '/vlm/scene_description', 10)
-        self.ann_pub   = self.create_publisher(Image, '/camera/vlm_annotated', 10)
-        self.head_pub  = self.create_publisher(
+        self.planner_state_pub  = self.create_publisher(String, '/planner/state', 10)
+        self.mode_pub           = self.create_publisher(String, '/controller/mode', 10)
+        self.plan_pub           = self.create_publisher(String, '/vlm/action_plan', 10)
+        self.scene_pub          = self.create_publisher(String, '/vlm/scene_description', 10)
+        self.ann_pub            = self.create_publisher(Image, '/camera/vlm_annotated', 10)
+        self.head_pub           = self.create_publisher(
             JointTrajectory, '/head_controller/joint_trajectory', 10)
-        self.arm_pub   = self.create_publisher(
+        self.arm_pub            = self.create_publisher(
             JointTrajectory, '/arm_controller/joint_trajectory', 10)
+        # Event contract v1.0
+        self.mission_started_pub   = self.create_publisher(String, '/mission/started',   10)
+        self.mission_completed_pub = self.create_publisher(String, '/mission/completed', 10)
+        self.safety_pub            = self.create_publisher(String, '/safety/event',      10)
+        self.inference_pub         = self.create_publisher(String, '/inference/event',   10)
 
         # ── Subscribers ─────────────────────────────────────────────────────
         self.create_subscription(Image,     '/camera/image_raw', self._image_cb,   sensor_qos)
@@ -187,6 +199,11 @@ class VLMPlanner(Node):
         self._command      = ''
         self._plan: Dict[str, Any] = {}
         self._plan_lock    = threading.Lock()
+
+        # Mission tracking for event contract
+        self._mission_id:         str   = ''
+        self._mission_start_time: float = 0.0
+        self._intervention_count: int   = 0
 
         self._vlm: Any     = None      # VLMInterface, loaded in thread
         self._vlm_ready    = False
@@ -258,6 +275,11 @@ class VLMPlanner(Node):
             self._state   = 'PLANNING'
         self._last_infer_t = 0.0   # trigger immediate inference
         self._pos_history.clear()  # reset temporal filter for new task
+        # Event contract: mission started
+        self._mission_id         = str(uuid.uuid4())
+        self._mission_start_time = time.monotonic()
+        self._intervention_count = 0
+        self._pub_mission_started(cmd)
 
     # ── Fast loop: 50 Hz ──────────────────────────────────────────────────────
 
@@ -266,7 +288,9 @@ class VLMPlanner(Node):
         front_min = self._front_distance()
         if front_min < OBSTACLE_STOP_DIST and self._state not in ('IDLE', 'COMPLETED'):
             self._pub_cmd(0.0, 0.5)   # back-off turn
-            self._pub_state('AVOID')
+            self.mode_pub.publish(String(data='EMERGENCY_STOP'))
+            self._pub_safety_event('collision_risk', 'high')
+            self._intervention_count += 1
             return
 
         if self._state == 'IDLE':
@@ -275,6 +299,7 @@ class VLMPlanner(Node):
 
         if self._state == 'COMPLETED':
             self._trigger_celebration()
+            self._pub_mission_completed(success=True, reason='target_reached')
             self._state = 'IDLE'
             return
 
@@ -382,11 +407,19 @@ class VLMPlanner(Node):
 
             self._last_infer_t = now
 
+            t_infer_start = time.monotonic()
             try:
                 plan = self._vlm.plan(frame, command)
+                infer_ok = True
             except Exception as e:
                 self.get_logger().error(f'[VLM] Inference exception: {e}')
+                self._pub_inference_event(
+                    latency_ms=(time.monotonic() - t_infer_start) * 1000,
+                    output_valid=False,
+                    confidence=0.0,
+                )
                 continue
+            latency_ms = (time.monotonic() - t_infer_start) * 1000
 
             # Validate and clamp VLM output
             plan = _validate_plan(plan)
@@ -404,6 +437,11 @@ class VLMPlanner(Node):
             with self._plan_lock:
                 self._plan = plan
             self._last_vlm_ok_t = now
+            self._pub_inference_event(
+                latency_ms=latency_ms,
+                output_valid=True,
+                confidence=float(plan.get('confidence', 0.0)),
+            )
             self.get_logger().info(
                 f'[VLM] plan: action={plan.get("action",{}).get("type")} '
                 f'target_found={plan.get("target_found")} '
@@ -445,7 +483,48 @@ class VLMPlanner(Node):
         self.cmd_pub.publish(msg)
 
     def _pub_state(self, state: str) -> None:
-        self.state_pub.publish(String(data=state))
+        self.planner_state_pub.publish(String(data=state))
+
+    def _pub_safety_event(self, event_type: str, severity: str) -> None:
+        payload = json.dumps({
+            'event_type': event_type,
+            'severity':   severity,
+            'timestamp':  self.get_clock().now().nanoseconds / 1e9,
+        })
+        self.safety_pub.publish(String(data=payload))
+
+    def _pub_mission_started(self, user_command: str) -> None:
+        payload = json.dumps({
+            'mission_id':     self._mission_id,
+            'mission_type':   'vlm_navigation',
+            'user_command':   user_command,
+            'timestamp':      self.get_clock().now().nanoseconds / 1e9,
+            'robot_id':       'walle3',
+            'site_id':        'default',
+            'schema_version': 'v1.0',
+        })
+        self.mission_started_pub.publish(String(data=payload))
+
+    def _pub_mission_completed(self, success: bool, reason: str) -> None:
+        duration_s = time.monotonic() - self._mission_start_time if self._mission_start_time else 0.0
+        payload = json.dumps({
+            'mission_id':          self._mission_id,
+            'success':             success,
+            'duration_s':          round(duration_s, 2),
+            'intervention_count':  self._intervention_count,
+            'reason':              reason,
+        })
+        self.mission_completed_pub.publish(String(data=payload))
+
+    def _pub_inference_event(self, latency_ms: float, output_valid: bool, confidence: float) -> None:
+        payload = json.dumps({
+            'model':        self.get_parameter('model_name').value,
+            'latency_ms':   round(latency_ms, 1),
+            'input_tokens': 0,
+            'output_valid': output_valid,
+            'confidence':   round(confidence, 3),
+        })
+        self.inference_pub.publish(String(data=payload))
 
     def _pub_head(self, yaw: float, pitch: float) -> None:
         self._pub_trajectory(self.head_pub,

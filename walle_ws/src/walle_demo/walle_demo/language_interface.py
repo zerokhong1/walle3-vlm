@@ -61,8 +61,8 @@ class LanguageInterface(Node):
 
         self.cmd_pub = self.create_publisher(String, '/user_command', 10)
 
-        # Also subscribe to behavior_state and scene to give user feedback
-        self.create_subscription(String, '/behavior_state',      self._state_cb,  10)
+        # Subscribe to planner/state and scene to give user feedback
+        self.create_subscription(String, '/planner/state',       self._state_cb,  10)
         self.create_subscription(String, '/vlm/scene_description', self._scene_cb, 10)
 
         self._last_state = 'IDLE'

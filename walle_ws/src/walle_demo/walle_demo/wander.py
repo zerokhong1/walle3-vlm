@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 """Reactive obstacle-avoidance wander controller — integrated with YOLOv8 + VLM override.
 
-Behavior priority (highest → lowest):
-  0. VLM_TASK     — vlm_planner issued an action plan → execute VLM command
+Publishes /controller/mode (contract v1.0):
+  VLM_TASK      — vlm_planner issued an action plan → execute VLM command
+  CAM_AVOID     — camera sees low obstacle LiDAR missed → reverse + turn
+  LIDAR_AVOID   — LiDAR obstacle or stuck escape maneuver
+  WANDER        — open space cruise, person/object detection, or init
+  EMERGENCY_STOP — not used here (emitted by vlm_planner on hard stop)
+
+Internal behavior priority (highest → lowest):
+  0. VLM_TASK     — vlm_planner issued an action plan
   1. ATTENTION    — person detected by camera  → stop + rotate to face person
   2. CURIOUS      — interesting object detected → slow approach
-  2.5 CAM_AVOID   — camera sees low obstacle LIDAR missed → reverse + turn
+  2.5 CAM_AVOID   — camera sees low obstacle LiDAR missed → reverse + turn
   3. ESCAPE       — stuck detector triggered (no movement despite cmd) → emergency escape
   4. AVOID        — LiDAR obstacle ahead → reverse + turn
   5. WANDER       — open space → cruise forward
@@ -109,8 +116,9 @@ class ReactiveWander(Node):
         )
 
         # ── Publishers / Subscribers ────────────────────────────────────────
-        self.cmd_pub   = self.create_publisher(TwistStamped, cmd_topic, 10)
-        self.state_pub = self.create_publisher(String, '/behavior_state', 10)
+        self.cmd_pub    = self.create_publisher(TwistStamped, cmd_topic, 10)
+        self.mode_pub   = self.create_publisher(String, '/controller/mode', 10)
+        self.safety_pub = self.create_publisher(String, '/safety/event', 10)
 
         self.create_subscription(LaserScan,    scan_topic,                              self._scan_cb,      be_qos)
         self.create_subscription(ImageMsg,     '/camera/image_raw',                     self._image_cb,     img_qos)
@@ -297,7 +305,7 @@ class ReactiveWander(Node):
                     self._trigger_escape(now)
                     # Fall through to execute escape below
                 else:
-                    self._pub_state('VLM_TASK')
+                    self._pub_mode('VLM_TASK')
                     return
             else:
                 self._vlm_active = False
@@ -307,7 +315,7 @@ class ReactiveWander(Node):
             age = (now - self.person_hit.timestamp).nanoseconds / 1e9
             if age < DETECTION_TIMEOUT:
                 self._do_attention(self.person_hit)
-                self._pub_state('ATTENTION')
+                self._pub_mode('WANDER')
                 return
             self.person_hit = None
 
@@ -316,7 +324,7 @@ class ReactiveWander(Node):
             age = (now - self.curious_hit.timestamp).nanoseconds / 1e9
             if age < DETECTION_TIMEOUT:
                 self._do_curious(self.curious_hit)
-                self._pub_state('CURIOUS')
+                self._pub_mode('WANDER')
                 return
             self.curious_hit = None
 
@@ -326,7 +334,7 @@ class ReactiveWander(Node):
             if cam_obs:
                 turn_sign = -1.0 if cam_side == 'right' else 1.0
                 self._start_avoid(now, turn_sign, reason=f'[CAM] Low obstacle {cam_side}')
-                self._pub_state('CAM_AVOID')
+                self._pub_mode('CAM_AVOID')
                 return
 
         # ── Priority 3: Stuck detector ───────────────────────────────────────
@@ -338,20 +346,20 @@ class ReactiveWander(Node):
         # ── Priority 4 & 5: LiDAR AVOID / WANDER ───────────────────────────
         if self.scan_state is None:
             self.publish_cmd(0.0, 0.35)
-            self._pub_state('INIT')
+            self._pub_mode('WANDER')
             return
 
         # Reverse phase — used by both _start_avoid and _trigger_escape
         if now < self.reverse_until:
             self.publish_cmd(-0.18, 0.0)
-            self._pub_state('ESCAPE' if self._escaping else 'AVOID')
+            self._pub_mode('LIDAR_AVOID')
             return
 
         # Turn phase
         if now < self.turn_until:
             spd = self.turn_spd * (1.3 if self._escaping else 1.0)
             self.publish_cmd(0.0, self.turn_direction * spd)
-            self._pub_state('ESCAPE' if self._escaping else 'AVOID')
+            self._pub_mode('LIDAR_AVOID')
             return
 
         self._escaping = False  # escape maneuver complete
@@ -370,17 +378,17 @@ class ReactiveWander(Node):
             turn_sign = 1.0 if left > right else -1.0
             self._trigger_escape(now, turn_sign, large=True)
             self._maybe_log(f'[CORNER TRAP] front={front:.2f} → full escape')
-            self._pub_state('ESCAPE')
+            self._pub_mode('LIDAR_AVOID')
             return
 
         # Diagonal obstacle → pre-emptive steer
         if front_left < self.safe_dist * 0.85 and front_right >= self.safe_dist * 0.85:
             self._start_avoid(now, -1.0, reason=f'Diag-left {front_left:.2f}m')
-            self._pub_state('AVOID')
+            self._pub_mode('LIDAR_AVOID')
             return
         if front_right < self.safe_dist * 0.85 and front_left >= self.safe_dist * 0.85:
             self._start_avoid(now, 1.0, reason=f'Diag-right {front_right:.2f}m')
-            self._pub_state('AVOID')
+            self._pub_mode('LIDAR_AVOID')
             return
 
         # Front obstacle
@@ -388,7 +396,7 @@ class ReactiveWander(Node):
             turn_sign = 1.0 if front_left > front_right else -1.0
             self._start_avoid(now, turn_sign,
                               reason=f'Obstacle ahead {front:.2f}m')
-            self._pub_state('AVOID')
+            self._pub_mode('LIDAR_AVOID')
             return
 
         # ── WANDER ──────────────────────────────────────────────────────────
@@ -405,7 +413,7 @@ class ReactiveWander(Node):
             self.bias = random.uniform(-0.18, 0.18)
 
         self.publish_cmd(linear, angular)
-        self._pub_state('WANDER')
+        self._pub_mode('WANDER')
 
     # ── Avoid helpers ─────────────────────────────────────────────────────────
 
@@ -437,6 +445,7 @@ class ReactiveWander(Node):
             f'[ESCAPE] reverse {rev_dur:.1f}s + turn {turn_dur:.1f}s '
             f'{"(large)" if large else ""}'
         )
+        self._pub_safety_event('stuck', 'medium')
 
     # ── YOLO behaviours ───────────────────────────────────────────────────────
 
@@ -483,8 +492,16 @@ class ReactiveWander(Node):
         msg.twist.angular.z = float(angular_z)
         self.cmd_pub.publish(msg)
 
-    def _pub_state(self, state: str) -> None:
-        self.state_pub.publish(String(data=state))
+    def _pub_mode(self, mode: str) -> None:
+        self.mode_pub.publish(String(data=mode))
+
+    def _pub_safety_event(self, event_type: str, severity: str) -> None:
+        payload = json.dumps({
+            'event_type': event_type,
+            'severity':   severity,
+            'timestamp':  self.get_clock().now().nanoseconds / 1e9,
+        })
+        self.safety_pub.publish(String(data=payload))
 
     def _maybe_log(self, text: str) -> None:
         now = self.get_clock().now()

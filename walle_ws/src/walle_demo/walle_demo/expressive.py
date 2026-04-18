@@ -74,7 +74,7 @@ class ExpressiveMotion(Node):
         self.create_subscription(String, '/detections',      self._detection_cb,    10)
         self.create_subscription(String, '/vlm/detections',  self._detection_cb,    10)
         self.create_subscription(String, '/vlm/action_plan', self._vlm_plan_cb,     10)
-        self.create_subscription(String, '/behavior_state',  self._behavior_state_cb, 10)
+        self.create_subscription(String, '/planner/state',   self._behavior_state_cb, 10)
 
         self._vlm_state = 'IDLE'
 
