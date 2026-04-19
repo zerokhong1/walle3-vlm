@@ -187,8 +187,8 @@ class TransformersBackend:
             )
             self.processor = AutoProcessor.from_pretrained(
                 self.model_name,
-                min_pixels=256 * 28 * 28,
-                max_pixels=512 * 28 * 28,
+                min_pixels=64 * 28 * 28,
+                max_pixels=128 * 28 * 28,
             )
             self.ready = True
             if self.log:
@@ -200,7 +200,7 @@ class TransformersBackend:
             return False
 
     def infer(self, frame: np.ndarray, prompt: str,
-              system: str = SYSTEM_PROMPT_VI, max_new_tokens: int = 512) -> str:
+              system: str = SYSTEM_PROMPT_VI, max_new_tokens: int = 256) -> str:
         """Run VLM inference. Returns raw text output."""
         if not self.ready:
             return ""

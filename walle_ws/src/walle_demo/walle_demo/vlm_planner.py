@@ -273,6 +273,8 @@ class VLMPlanner(Node):
         with self._state_lock:
             self._command = cmd
             self._state   = 'PLANNING'
+        with self._plan_lock:
+            self._plan = {}        # clear stale plan to prevent instant false completion
         self._last_infer_t = 0.0   # trigger immediate inference
         self._pos_history.clear()  # reset temporal filter for new task
         # Event contract: mission started

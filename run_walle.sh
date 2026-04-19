@@ -28,6 +28,7 @@ pkill -f "expressive"    2>/dev/null || true
 pkill -f "perception"    2>/dev/null || true
 pkill -f "vlm_planner"   2>/dev/null || true
 pkill -f "language_interface" 2>/dev/null || true
+pkill -f "mission_logger" 2>/dev/null || true
 pkill -f "Xvfb :99"     2>/dev/null || true
 sleep 1
 rm -f /tmp/.X99-lock /tmp/.X11-unix/X99 2>/dev/null || true
@@ -82,6 +83,17 @@ ros2 launch walle_bringup vlm.launch.py \
 VLM_PID=$!
 echo "    VLM PID=$VLM_PID"
 
+# ── 4. Mission Logger ─────────────────────────────────────────────────────────
+echo ">>> [4/4] Starting mission logger (CSV → ~/walle_logs/)..."
+ros2 run walle_demo mission_logger \
+  --ros-args \
+  -p log_dir:="$HOME/walle_logs" \
+  -p robot_id:=walle3 \
+  -p site_id:=default \
+  > /tmp/mission_logger.log 2>&1 &
+LOGGER_PID=$!
+echo "    Logger PID=$LOGGER_PID"
+
 # ── Confirm windows open ─────────────────────────────────────────────────────
 sleep 8
 echo ""
@@ -95,7 +107,13 @@ echo ""
 echo "  VLM topics:"
 echo "    /user_command          — send commands to robot"
 echo "    /vlm/action_plan       — action plan JSON"
-echo "    /behavior_state        — robot state"
+echo "    /planner/state         — mission lifecycle (IDLE|PLANNING|SEARCHING|APPROACHING|CONFIRMING|COMPLETED)"
+echo "    /controller/mode       — controller mode (VLM_TASK|CAM_AVOID|LIDAR_AVOID|WANDER|EMERGENCY_STOP)"
+echo ""
+echo "  Telemetry:"
+echo "    /mission/started       — mission start event (JSON)"
+echo "    /mission/completed     — mission end event (JSON)"
+echo "    ~/walle_logs/          — CSV fact tables (mission_logger)"
 echo ""
 echo "  Example command:"
 echo "    ros2 topic pub --once /user_command std_msgs/msg/String \\"
