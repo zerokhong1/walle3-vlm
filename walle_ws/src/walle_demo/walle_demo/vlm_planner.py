@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import math
+import random
 import threading
 import time
 import uuid
@@ -289,7 +290,8 @@ class VLMPlanner(Node):
         # LiDAR safety check
         front_min = self._front_distance()
         if front_min < OBSTACLE_STOP_DIST and self._state not in ('IDLE', 'COMPLETED'):
-            self._pub_cmd(0.0, 0.5)   # back-off turn
+            turn_dir = 1.0 if random.random() > 0.5 else -1.0
+            self._pub_cmd(-0.15, turn_dir * 0.5)   # reverse + turn to escape
             self.mode_pub.publish(String(data='EMERGENCY_STOP'))
             self._pub_safety_event('collision_risk', 'high')
             self._intervention_count += 1
@@ -329,8 +331,8 @@ class VLMPlanner(Node):
         # When searching (target not found), drive a slow rotation scan
         # so the robot actively scans the environment instead of stopping
         if a_type == 'search' and not plan.get('target_found', False):
-            speed   = 0.0
-            angular = 0.30   # slow in-place rotation to scan surroundings
+            speed   = 0.08   # slow forward to explore while scanning
+            angular = 0.30
 
         if front_min < OBSTACLE_SLOW_DIST:
             speed *= 0.4

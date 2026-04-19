@@ -206,7 +206,7 @@ class ReactiveWander(Node):
             self._vlm_active = False
         else:
             self._vlm_active  = True
-            self._vlm_timeout = self.get_clock().now() + rclpy.duration.Duration(seconds=5)
+            self._vlm_timeout = self.get_clock().now() + rclpy.duration.Duration(seconds=15)
 
     def _detection_cb(self, msg: String) -> None:
         try:
