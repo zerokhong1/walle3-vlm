@@ -436,11 +436,12 @@ class VLMPlanner(Node):
 
             with self._plan_lock:
                 self._plan = plan
-            self._last_vlm_ok_t = now
+            self._last_vlm_ok_t = time.monotonic()   # use actual completion time
             self._pub_inference_event(
                 latency_ms=latency_ms,
                 output_valid=True,
                 confidence=float(plan.get('confidence', 0.0)),
+                target_found=bool(plan.get('target_found', False)),
             )
             self.get_logger().info(
                 f'[VLM] plan: action={plan.get("action",{}).get("type")} '
@@ -516,12 +517,14 @@ class VLMPlanner(Node):
         })
         self.mission_completed_pub.publish(String(data=payload))
 
-    def _pub_inference_event(self, latency_ms: float, output_valid: bool, confidence: float) -> None:
+    def _pub_inference_event(self, latency_ms: float, output_valid: bool,
+                             confidence: float, target_found: bool = False) -> None:
         payload = json.dumps({
             'model':        self.get_parameter('model_name').value,
             'latency_ms':   round(latency_ms, 1),
             'input_tokens': 0,
             'output_valid': output_valid,
+            'target_found': target_found,
             'confidence':   round(confidence, 3),
         })
         self.inference_pub.publish(String(data=payload))

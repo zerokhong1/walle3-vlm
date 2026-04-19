@@ -25,6 +25,7 @@ setup(
             'vlm_planner = walle_demo.vlm_planner:main',
             'vlm_perception = walle_demo.vlm_perception:main',
             'language_interface = walle_demo.language_interface:main',
+            'mission_logger = walle_demo.mission_logger_node:main',
         ],
     },
 )
