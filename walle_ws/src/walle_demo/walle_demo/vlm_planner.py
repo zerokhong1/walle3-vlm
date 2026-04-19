@@ -218,6 +218,10 @@ class VLMPlanner(Node):
         self._last_infer_t  = 0.0
         self._last_vlm_ok_t = time.monotonic()   # watchdog: last successful VLM inference
 
+        # Internal escape state — stable direction for full 1.5s duration
+        self._escape_until:    float = 0.0
+        self._escape_turn_dir: float = 1.0
+
         # Temporal filtering: smooth target_position decisions (majority vote, window=3)
         self._pos_history: List[str] = []
 
@@ -287,11 +291,21 @@ class VLMPlanner(Node):
     # ── Fast loop: 50 Hz ──────────────────────────────────────────────────────
 
     def _fast_loop(self) -> None:
-        # LiDAR safety check
+        now_t     = time.monotonic()
         front_min = self._front_distance()
+
+        # Stable escape: keep reversing+turning for the full escape window.
+        # Direction is chosen ONCE when escape starts, not re-randomised every tick.
+        if now_t < self._escape_until and self._state not in ('IDLE', 'COMPLETED'):
+            self._pub_cmd(-0.15, self._escape_turn_dir * 0.5)
+            self.mode_pub.publish(String(data='EMERGENCY_STOP'))
+            return
+
+        # Trigger new escape when too close — pick direction once, hold for 1.5 s
         if front_min < OBSTACLE_STOP_DIST and self._state not in ('IDLE', 'COMPLETED'):
-            turn_dir = 1.0 if random.random() > 0.5 else -1.0
-            self._pub_cmd(-0.15, turn_dir * 0.5)   # reverse + turn to escape
+            self._escape_turn_dir = 1.0 if random.random() > 0.5 else -1.0
+            self._escape_until    = now_t + 1.5
+            self._pub_cmd(-0.15, self._escape_turn_dir * 0.5)
             self.mode_pub.publish(String(data='EMERGENCY_STOP'))
             self._pub_safety_event('collision_risk', 'high')
             self._intervention_count += 1
@@ -331,10 +345,10 @@ class VLMPlanner(Node):
         # When searching (target not found), drive a slow rotation scan
         # so the robot actively scans the environment instead of stopping
         if a_type == 'search' and not plan.get('target_found', False):
-            speed   = 0.08   # slow forward to explore while scanning
+            # Move forward to explore, but stop if obstacle is close
+            speed   = 0.0 if front_min < OBSTACLE_SLOW_DIST else 0.08
             angular = 0.30
-
-        if front_min < OBSTACLE_SLOW_DIST:
+        elif front_min < OBSTACLE_SLOW_DIST:
             speed *= 0.4
 
         self._pub_cmd(speed, angular)

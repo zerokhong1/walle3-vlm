@@ -297,16 +297,11 @@ class ReactiveWander(Node):
         if self._vlm_active:
             if now < self._vlm_timeout:
                 self._cmd_vx = 0.0
-                # Still run stuck detection — vlm_planner may have us moving into obstacle
-                if self._update_stuck(now):
-                    self._stuck_since = None
-                    self._vlm_active  = False   # override VLM, escape takes priority
-                    self.get_logger().warn('[VLM_TASK] STUCK detected — overriding VLM, escaping')
-                    self._trigger_escape(now)
-                    # Fall through to execute escape below
-                else:
-                    self._pub_mode('VLM_TASK')
-                    return
+                # vlm_planner publishes at 50 Hz — any escape from wander (10 Hz)
+                # would be immediately overwritten. Let vlm_planner's internal
+                # escape state (1.5 s stable reverse+turn) handle stuck recovery.
+                self._pub_mode('VLM_TASK')
+                return
             else:
                 self._vlm_active = False
 
