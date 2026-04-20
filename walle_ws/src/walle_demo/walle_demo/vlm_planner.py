@@ -75,6 +75,11 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "angular_max":         0.60,
 }
 
+# ── I-011: Stop SLA — keywords handled in fast path, no VLM needed ───────────
+_STOP_KEYWORDS = frozenset({
+    'stop', 'dừng', 'dung', 'halt', 'cancel', 'hủy', 'huy', 'thoát', 'thoat', 'dừng lại',
+})
+
 # ── VLM output validation ─────────────────────────────────────────────────────
 _VALID_ACTION_TYPES = {'go_forward', 'turn_left', 'turn_right', 'stop', 'search', 'reverse'}
 _VALID_POSITIONS    = {'left', 'center', 'right', 'unknown'}
@@ -167,8 +172,9 @@ class VLMPlanner(Node):
         )
 
         # ── Publishers ──────────────────────────────────────────────────────
-        self.cmd_pub            = self.create_publisher(
-            TwistStamped, '/diff_drive_base_controller/cmd_vel', 10)
+        # cmd_vel split into two mux channels (I-006)
+        self.safety_cmd_pub     = self.create_publisher(TwistStamped, '/cmd_vel/safety', 10)
+        self.nav_cmd_pub        = self.create_publisher(TwistStamped, '/cmd_vel/vlm',    10)
         self.planner_state_pub  = self.create_publisher(String, '/planner/state', 10)
         self.mode_pub           = self.create_publisher(String, '/controller/mode', 10)
         self.plan_pub           = self.create_publisher(String, '/vlm/action_plan', 10)
@@ -274,15 +280,30 @@ class VLMPlanner(Node):
         cmd = msg.data.strip()
         if not cmd:
             return
-        self.get_logger().info(f'[VLM] Command received: "{cmd}"')
+
+        # I-011: Fast-path stop — do not enter VLM loop
+        if cmd.lower() in _STOP_KEYWORDS:
+            self.get_logger().info(f'[STOP] Fast-path stop: "{cmd}"')
+            with self._state_lock:
+                self._state   = 'IDLE'
+                self._command = ''
+            with self._plan_lock:
+                self._plan = {}
+            self._pub_safety_cmd(0.0, 0.0)
+            if self._mission_start_time:
+                self._pub_mission_completed(success=False, reason='operator_stop')
+                self._mission_start_time = 0.0
+            self._pub_state('IDLE')
+            return
+
+        self.get_logger().info(f'[VLM] Command: "{cmd}"')
         with self._state_lock:
             self._command = cmd
             self._state   = 'PLANNING'
         with self._plan_lock:
-            self._plan = {}        # clear stale plan to prevent instant false completion
-        self._last_infer_t = 0.0   # trigger immediate inference
-        self._pos_history.clear()  # reset temporal filter for new task
-        # Event contract: mission started
+            self._plan = {}
+        self._last_infer_t = 0.0
+        self._pos_history.clear()
         self._mission_id         = str(uuid.uuid4())
         self._mission_start_time = time.monotonic()
         self._intervention_count = 0
@@ -294,10 +315,9 @@ class VLMPlanner(Node):
         now_t     = time.monotonic()
         front_min = self._front_distance()
 
-        # Stable escape: keep reversing+turning for the full escape window.
-        # Direction is chosen ONCE when escape starts, not re-randomised every tick.
+        # Stable escape via safety channel — direction fixed for 1.5 s.
         if now_t < self._escape_until and self._state not in ('IDLE', 'COMPLETED'):
-            self._pub_cmd(-0.15, self._escape_turn_dir * 0.5)
+            self._pub_safety_cmd(-0.15, self._escape_turn_dir * 0.5)
             self.mode_pub.publish(String(data='EMERGENCY_STOP'))
             return
 
@@ -305,7 +325,7 @@ class VLMPlanner(Node):
         if front_min < OBSTACLE_STOP_DIST and self._state not in ('IDLE', 'COMPLETED'):
             self._escape_turn_dir = 1.0 if random.random() > 0.5 else -1.0
             self._escape_until    = now_t + 1.5
-            self._pub_cmd(-0.15, self._escape_turn_dir * 0.5)
+            self._pub_safety_cmd(-0.15, self._escape_turn_dir * 0.5)
             self.mode_pub.publish(String(data='EMERGENCY_STOP'))
             self._pub_safety_event('collision_risk', 'high')
             self._intervention_count += 1
@@ -461,11 +481,17 @@ class VLMPlanner(Node):
                 confidence=float(plan.get('confidence', 0.0)),
                 target_found=bool(plan.get('target_found', False)),
             )
+            # I-005: structured inference log for post-mortem analysis
+            action = plan.get('action', {})
             self.get_logger().info(
-                f'[VLM] plan: action={plan.get("action",{}).get("type")} '
+                f'[INFER] latency={latency_ms:.0f}ms '
+                f'action={action.get("type")} '
                 f'target_found={plan.get("target_found")} '
-                f'pos={plan.get("target_position")} dist={plan.get("target_distance")} '
-                f'status={plan.get("status")}'
+                f'pos={plan.get("target_position")} '
+                f'dist={plan.get("target_distance")} '
+                f'status={plan.get("status")} '
+                f'confidence={plan.get("confidence", 0.0):.2f} '
+                f'cmd="{command[:40]}"'
             )
 
     # ── LiDAR helpers ─────────────────────────────────────────────────────────
@@ -493,13 +519,21 @@ class VLMPlanner(Node):
 
     # ── Publishers ────────────────────────────────────────────────────────────
 
-    def _pub_cmd(self, linear: float, angular: float) -> None:
+    def _make_twist(self, linear: float, angular: float) -> TwistStamped:
         msg = TwistStamped()
         msg.header.stamp    = self.get_clock().now().to_msg()
         msg.header.frame_id = 'base_footprint'
         msg.twist.linear.x  = float(linear)
         msg.twist.angular.z = float(angular)
-        self.cmd_pub.publish(msg)
+        return msg
+
+    def _pub_cmd(self, linear: float, angular: float) -> None:
+        """Normal navigation command → /cmd_vel/vlm (priority 1 in mux)."""
+        self.nav_cmd_pub.publish(self._make_twist(linear, angular))
+
+    def _pub_safety_cmd(self, linear: float, angular: float) -> None:
+        """Safety command → /cmd_vel/safety (priority 0 in mux, always wins)."""
+        self.safety_cmd_pub.publish(self._make_twist(linear, angular))
 
     def _pub_state(self, state: str) -> None:
         self.planner_state_pub.publish(String(data=state))
@@ -658,7 +692,7 @@ class VLMPlanner(Node):
         """Head nod + wave arms when target reached."""
         self._pub_head(0.0, -0.25)
         self._pub_arms(0.80, -0.80)
-        self._pub_cmd(0.0, 0.0)
+        self._pub_safety_cmd(0.0, 0.0)   # hard stop via safety channel
         self.get_logger().info('[VLM] Celebration! Target reached.')
 
 
