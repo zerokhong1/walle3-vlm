@@ -55,6 +55,29 @@ def generate_launch_description():
         emulate_tty=True,
     )
 
+    cmd_vel_mux_node = Node(
+        package='walle_demo',
+        executable='cmd_vel_mux',
+        name='cmd_vel_mux',
+        output='screen',
+        parameters=[{'use_sim_time': use_sim_time}],
+    )
+
+    stuck_watchdog_node = Node(
+        package='walle_demo',
+        executable='stuck_watchdog',
+        name='stuck_watchdog',
+        output='screen',
+        parameters=[{'use_sim_time': use_sim_time}],
+    )
+
+    rosbag_trigger_node = Node(
+        package='walle_demo',
+        executable='rosbag_trigger',
+        name='rosbag_trigger',
+        output='screen',
+    )
+
     return LaunchDescription([
         DeclareLaunchArgument(
             'use_sim_time', default_value='true',
@@ -63,6 +86,9 @@ def generate_launch_description():
             'start_vlm_perception', default_value='false',
             description='Also start VLM perception node (shares GPU with planner)'),
 
+        cmd_vel_mux_node,
+        stuck_watchdog_node,
+        rosbag_trigger_node,
         vlm_planner_node,
         vlm_perception_node,
         language_interface_node,

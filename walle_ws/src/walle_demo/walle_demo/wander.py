@@ -116,7 +116,9 @@ class ReactiveWander(Node):
         )
 
         # ── Publishers / Subscribers ────────────────────────────────────────
-        self.cmd_pub    = self.create_publisher(TwistStamped, cmd_topic, 10)
+        # I-006: split into two mux channels
+        self.safety_cmd_pub = self.create_publisher(TwistStamped, '/cmd_vel/safety', 10)
+        self.nav_cmd_pub    = self.create_publisher(TwistStamped, '/cmd_vel/wander', 10)
         self.mode_pub   = self.create_publisher(String, '/controller/mode', 10)
         self.safety_pub = self.create_publisher(String, '/safety/event', 10)
 
@@ -328,8 +330,9 @@ class ReactiveWander(Node):
             cam_obs, cam_side = self._check_camera_low_obstacle()
             if cam_obs:
                 turn_sign = -1.0 if cam_side == 'right' else 1.0
-                self._start_avoid(now, turn_sign, reason=f'[CAM] Low obstacle {cam_side}')
+                self._start_avoid(now, turn_sign, reason=f'[CAM_AVOID] Low obstacle {cam_side}')
                 self._pub_mode('CAM_AVOID')
+                # Motion executed via safety channel in next reverse/turn ticks
                 return
 
         # ── Priority 3: Stuck detector ───────────────────────────────────────
@@ -344,16 +347,16 @@ class ReactiveWander(Node):
             self._pub_mode('WANDER')
             return
 
-        # Reverse phase — used by both _start_avoid and _trigger_escape
+        # Reverse phase — safety channel: overrides VLM nav in mux
         if now < self.reverse_until:
-            self.publish_cmd(-0.18, 0.0)
+            self.publish_safety(-0.18, 0.0)
             self._pub_mode('LIDAR_AVOID')
             return
 
-        # Turn phase
+        # Turn phase — safety channel
         if now < self.turn_until:
             spd = self.turn_spd * (1.3 if self._escaping else 1.0)
-            self.publish_cmd(0.0, self.turn_direction * spd)
+            self.publish_safety(0.0, self.turn_direction * spd)
             self._pub_mode('LIDAR_AVOID')
             return
 
@@ -478,14 +481,23 @@ class ReactiveWander(Node):
     def _normalize(value: float, clip_max: float = 2.5) -> float:
         return min(max(value, 0.0), clip_max) / clip_max
 
-    def publish_cmd(self, linear_x: float, angular_z: float) -> None:
-        self._cmd_vx = abs(linear_x)
+    def _make_twist(self, linear_x: float, angular_z: float) -> TwistStamped:
         msg = TwistStamped()
         msg.header.stamp    = self.get_clock().now().to_msg()
         msg.header.frame_id = 'base_footprint'
         msg.twist.linear.x  = float(linear_x)
         msg.twist.angular.z = float(angular_z)
-        self.cmd_pub.publish(msg)
+        return msg
+
+    def publish_cmd(self, linear_x: float, angular_z: float) -> None:
+        """Navigation-priority command → /cmd_vel/wander (priority 2 in mux)."""
+        self._cmd_vx = abs(linear_x)
+        self.nav_cmd_pub.publish(self._make_twist(linear_x, angular_z))
+
+    def publish_safety(self, linear_x: float, angular_z: float) -> None:
+        """Safety-priority command → /cmd_vel/safety (priority 0 in mux)."""
+        self._cmd_vx = abs(linear_x)
+        self.safety_cmd_pub.publish(self._make_twist(linear_x, angular_z))
 
     def _pub_mode(self, mode: str) -> None:
         self.mode_pub.publish(String(data=mode))

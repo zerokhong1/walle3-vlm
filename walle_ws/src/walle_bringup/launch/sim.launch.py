@@ -117,6 +117,16 @@ def generate_launch_description():
         output='screen',
     )
 
+    cmd_vel_mux_node = Node(
+        package='walle_demo', executable='cmd_vel_mux', output='screen',
+        condition=IfCondition(start_demo),
+        parameters=[{'use_sim_time': use_sim_time}],
+    )
+    stuck_watchdog_node = Node(
+        package='walle_demo', executable='stuck_watchdog', output='screen',
+        condition=IfCondition(start_demo),
+        parameters=[{'use_sim_time': use_sim_time}],
+    )
     wander_node = Node(
         package='walle_demo', executable='wander', output='screen',
         condition=IfCondition(start_demo),
@@ -182,6 +192,7 @@ def generate_launch_description():
             target_action=joint_state_broadcaster,
             on_exit=[
                 diff_drive_controller, head_controller, arm_controller,
+                cmd_vel_mux_node, stuck_watchdog_node,
                 wander_node, expressive_node, perception_node,
                 vlm_planner_node, vlm_perception_node, language_interface_node,
             ],
