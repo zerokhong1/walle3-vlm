@@ -299,9 +299,25 @@ class ReactiveWander(Node):
         if self._vlm_active:
             if now < self._vlm_timeout:
                 self._cmd_vx = 0.0
-                # vlm_planner publishes at 50 Hz — any escape from wander (10 Hz)
-                # would be immediately overwritten. Let vlm_planner's internal
-                # escape state (1.5 s stable reverse+turn) handle stuck recovery.
+                # BUG-3 fix: even during VLM_TASK, wander must run a LiDAR
+                # safety check via the safety channel (P0 in mux). This is
+                # defense-in-depth against vlm_planner's sector missing a wall.
+                # Use tighter threshold (55% of safe_dist) to avoid interfering
+                # with normal VLM navigation.
+                if (self.scan_state is not None
+                        and now >= self.reverse_until
+                        and now >= self.turn_until):
+                    front      = self._sector_min(-0.52, 0.52)
+                    front_left = self._sector_min( 0.52, 1.05)
+                    front_right = self._sector_min(-1.05, -0.52)
+                    closest = min(front, front_left, front_right)
+                    if closest < self.safe_dist * 0.55:
+                        turn_sign = 1.0 if front_left > front_right else -1.0
+                        self._start_avoid(now, turn_sign,
+                                          reason=f'[VLM_TASK SAFETY] {closest:.2f}m')
+                        self.publish_safety(-0.18, 0.0)
+                        self._pub_mode('LIDAR_AVOID')
+                        return
                 self._pub_mode('VLM_TASK')
                 return
             else:
