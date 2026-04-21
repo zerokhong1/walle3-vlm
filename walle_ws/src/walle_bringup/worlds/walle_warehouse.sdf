@@ -1,0 +1,543 @@
+<?xml version="1.0" ?>
+<!--
+  walle_warehouse.sdf  —  VinMotion Warehouse World v1.0
+  20m × 15m × 4m, ogre2 renderer.
+
+  Coordinate convention (spec §1.2):
+    Origin (0,0) = south-west corner
+    X → east   Y → north   Z → up
+
+  Zones:
+    A  Receiving   x= 0– 4   y= 0–15
+    B  Main lane   x= 4–16   y= 6– 9
+    C  Storage     x= 4–16   y= 0– 5  and  y=10–15
+    D  Picking     x=16–20   y= 0–15
+    E  Buffer      x= 4–16   y= 5– 6  and  y= 9–10
+
+  Obstacle → test mapping (ISSUES.md):
+    pallet_low_*   I-002 root-cause-1  object below LiDAR plane 0.18 m
+    carton_box_*   I-002 root-cause-1  marginal height ≈ LiDAR plane
+    debris_bag     I-002 root-cause-2  low-contrast dark object
+    lane marking   I-002 root-cause-3  floor-sample contamination risk
+    storage_rack_* I-002               narrow lane navigation
+-->
+<sdf version="1.9">
+<world name="walle_warehouse">
+
+  <gravity>0 0 -9.81</gravity>
+  <atmosphere type="adiabatic"/>
+
+  <physics name="physics" type="ignored">
+    <max_step_size>0.001</max_step_size>
+    <real_time_factor>1.0</real_time_factor>
+    <real_time_update_rate>1000</real_time_update_rate>
+  </physics>
+
+  <plugin filename="gz-sim-physics-system"        name="gz::sim::systems::Physics"/>
+  <plugin filename="gz-sim-user-commands-system"  name="gz::sim::systems::UserCommands"/>
+  <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+  <plugin filename="gz-sim-sensors-system"        name="gz::sim::systems::Sensors">
+    <render_engine>ogre2</render_engine>
+  </plugin>
+
+  <!-- ── Lighting: dim industrial warehouse (spec §1.5) ──────────────── -->
+  <scene>
+    <ambient>0.4 0.4 0.4 1</ambient>
+    <background>0.1 0.1 0.12 1</background>
+    <shadows>true</shadows>
+  </scene>
+
+  <light name="sun" type="directional">
+    <cast_shadows>true</cast_shadows>
+    <pose>0 0 10 0 0 0</pose>
+    <diffuse>0.75 0.75 0.80 1</diffuse>
+    <specular>0.15 0.15 0.15 1</specular>
+    <direction>-0.5 0.1 -0.9</direction>
+  </light>
+
+  <light name="ceil_a"  type="point"><pose> 2  7.5 3.5 0 0 0</pose>
+    <diffuse>1.0 0.95 0.85 1</diffuse><specular>0.2 0.2 0.2 1</specular>
+    <attenuation><range>8</range><constant>0.2</constant><linear>0.05</linear><quadratic>0.02</quadratic></attenuation>
+  </light>
+  <light name="ceil_b1" type="point"><pose> 8  7.5 3.5 0 0 0</pose>
+    <diffuse>1.0 0.95 0.85 1</diffuse><specular>0.2 0.2 0.2 1</specular>
+    <attenuation><range>8</range><constant>0.2</constant><linear>0.05</linear><quadratic>0.02</quadratic></attenuation>
+  </light>
+  <light name="ceil_b2" type="point"><pose>12  7.5 3.5 0 0 0</pose>
+    <diffuse>1.0 0.95 0.85 1</diffuse><specular>0.2 0.2 0.2 1</specular>
+    <attenuation><range>8</range><constant>0.2</constant><linear>0.05</linear><quadratic>0.02</quadratic></attenuation>
+  </light>
+  <light name="ceil_d"  type="point"><pose>18  7.5 3.5 0 0 0</pose>
+    <diffuse>1.0 0.95 0.85 1</diffuse><specular>0.2 0.2 0.2 1</specular>
+    <attenuation><range>8</range><constant>0.2</constant><linear>0.05</linear><quadratic>0.02</quadratic></attenuation>
+  </light>
+
+  <!-- ── Ground plane: concrete gray (spec §1.5) ─────────────────────── -->
+  <model name="ground_plane">
+    <static>true</static>
+    <link name="link">
+      <collision name="col">
+        <geometry><plane><normal>0 0 1</normal><size>20 15</size></plane></geometry>
+        <surface><friction><ode><mu>0.8</mu><mu2>0.8</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis">
+        <pose>10 7.5 0 0 0 0</pose>
+        <geometry><plane><normal>0 0 1</normal><size>20 15</size></plane></geometry>
+        <material>
+          <ambient>0.50 0.50 0.50 1</ambient>
+          <diffuse>0.55 0.55 0.55 1</diffuse>
+          <specular>0.03 0.03 0.03 1</specular>
+        </material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- ── Outer walls ──────────────────────────────────────────────────── -->
+  <!-- South wall  y=0,  x=0→20 -->
+  <model name="wall_south">
+    <static>true</static><pose>10 0 2 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>20 0.25 4</size></box></geometry></collision>
+      <visual name="vis"><geometry><box><size>20 0.25 4</size></box></geometry>
+        <material><ambient>0.45 0.45 0.50 1</ambient><diffuse>0.50 0.50 0.55 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- North wall  y=15, x=0→20 -->
+  <model name="wall_north">
+    <static>true</static><pose>10 15 2 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>20 0.25 4</size></box></geometry></collision>
+      <visual name="vis"><geometry><box><size>20 0.25 4</size></box></geometry>
+        <material><ambient>0.45 0.45 0.50 1</ambient><diffuse>0.50 0.50 0.55 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- East wall   x=20, y=0→15 -->
+  <model name="wall_east">
+    <static>true</static><pose>20 7.5 2 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>0.25 15 4</size></box></geometry></collision>
+      <visual name="vis"><geometry><box><size>0.25 15 4</size></box></geometry>
+        <material><ambient>0.45 0.45 0.50 1</ambient><diffuse>0.50 0.50 0.55 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- West wall south segment  x=0, y=0→6 (below rolling door) -->
+  <model name="wall_west_south">
+    <static>true</static><pose>0 3 2 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>0.25 6 4</size></box></geometry></collision>
+      <visual name="vis"><geometry><box><size>0.25 6 4</size></box></geometry>
+        <material><ambient>0.45 0.45 0.50 1</ambient><diffuse>0.50 0.50 0.55 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- West wall north segment  x=0, y=9→15 (above rolling door) -->
+  <model name="wall_west_north">
+    <static>true</static><pose>0 12 2 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>0.25 6 4</size></box></geometry></collision>
+      <visual name="vis"><geometry><box><size>0.25 6 4</size></box></geometry>
+        <material><ambient>0.45 0.45 0.50 1</ambient><diffuse>0.50 0.50 0.55 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- Rolling door lintel  x=0, y=6→9, z=2.5→4  (spec §1.3.5) -->
+  <!-- PURPOSE: entry/exit point for missions; gap 3m×2.5m -->
+  <model name="door_lintel">
+    <static>true</static><pose>0 7.5 3.25 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>0.25 3 1.5</size></box></geometry></collision>
+      <visual name="vis"><geometry><box><size>0.25 3 1.5</size></box></geometry>
+        <material><ambient>0.45 0.45 0.50 1</ambient><diffuse>0.50 0.50 0.55 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- ── Zone C: Storage racks (spec §1.3.3) ──────────────────────────── -->
+  <!-- 4 racks, 8m×0.5m×3m.  Under-rack clearance 0.25m (legs only).
+       Lane between S1/S2 = 1.5m, between N1/N2 = 1.5m.
+       PURPOSE: narrow lane navigation + potential under-rack obstacles.
+  -->
+
+  <!-- South rack pair (Zone C south, y=0–5) -->
+  <model name="rack_s1">
+    <static>true</static><pose>10 1.5 1.5 0 0 0</pose>
+    <link name="link">
+      <!-- Under-rack gap: z=0→0.25 is open; rack body z=0.25→3 -->
+      <collision name="col_body"><pose>0 0 0.125 0 0 0</pose>
+        <geometry><box><size>11 0.5 2.75</size></box></geometry></collision>
+      <collision name="col_legs"><pose>0 0 -1.375 0 0 0</pose>
+        <geometry><box><size>11 0.5 0.25</size></box></geometry></collision>
+      <visual name="vis_body"><pose>0 0 0.125 0 0 0</pose>
+        <geometry><box><size>11 0.5 2.75</size></box></geometry>
+        <material><ambient>0.50 0.50 0.55 1</ambient><diffuse>0.55 0.55 0.60 1</diffuse></material>
+      </visual>
+      <visual name="vis_legs"><pose>0 0 -1.375 0 0 0</pose>
+        <geometry><box><size>11 0.5 0.25</size></box></geometry>
+        <material><ambient>0.40 0.40 0.45 1</ambient><diffuse>0.45 0.45 0.50 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <model name="rack_s2">
+    <static>true</static><pose>10 3.5 1.5 0 0 0</pose>
+    <link name="link">
+      <collision name="col_body"><pose>0 0 0.125 0 0 0</pose>
+        <geometry><box><size>11 0.5 2.75</size></box></geometry></collision>
+      <visual name="vis_body"><pose>0 0 0.125 0 0 0</pose>
+        <geometry><box><size>11 0.5 2.75</size></box></geometry>
+        <material><ambient>0.50 0.50 0.55 1</ambient><diffuse>0.55 0.55 0.60 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- North rack pair (Zone C north, y=10–15) -->
+  <model name="rack_n1">
+    <static>true</static><pose>10 11.5 1.5 0 0 0</pose>
+    <link name="link">
+      <collision name="col_body"><pose>0 0 0.125 0 0 0</pose>
+        <geometry><box><size>11 0.5 2.75</size></box></geometry></collision>
+      <visual name="vis_body"><pose>0 0 0.125 0 0 0</pose>
+        <geometry><box><size>11 0.5 2.75</size></box></geometry>
+        <material><ambient>0.50 0.50 0.55 1</ambient><diffuse>0.55 0.55 0.60 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <model name="rack_n2">
+    <static>true</static><pose>10 13.5 1.5 0 0 0</pose>
+    <link name="link">
+      <collision name="col_body"><pose>0 0 0.125 0 0 0</pose>
+        <geometry><box><size>11 0.5 2.75</size></box></geometry></collision>
+      <visual name="vis_body"><pose>0 0 0.125 0 0 0</pose>
+        <geometry><box><size>11 0.5 2.75</size></box></geometry>
+        <material><ambient>0.50 0.50 0.55 1</ambient><diffuse>0.55 0.55 0.60 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- ── Zone D: Low pallets (spec §1.3.1) ────────────────────────────── -->
+  <!-- 6× pallet 1.2×0.8×0.15m. z=0.075 (center = half height).
+       HEIGHT 0.15m < LiDAR plane 0.18m → PURPOSE: I-002 root-cause-1.
+       At least 2 placed in the middle of the Zone D path.
+  -->
+
+  <!-- D1: south lane, blocking path -->
+  <model name="pallet_low_d1">
+    <static>true</static><pose>17.5 3.0 0.075 0 0 0</pose>
+    <!-- PURPOSE I-002: 0.15m < LiDAR 0.18m, blocks path in Zone D south -->
+    <link name="link">
+      <collision name="col"><geometry><box><size>1.2 0.8 0.15</size></box></geometry></collision>
+      <visual name="vis"><geometry><box><size>1.2 0.8 0.15</size></box></geometry>
+        <material><ambient>0.55 0.35 0.20 1</ambient><diffuse>0.60 0.38 0.22 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- D2: center of Zone D, direct axis block -->
+  <model name="pallet_low_d2">
+    <static>true</static><pose>18.5 7.5 0.075 0 0 0</pose>
+    <!-- PURPOSE I-002: central block in Zone D, robot must detect via camera -->
+    <link name="link">
+      <collision name="col"><geometry><box><size>1.2 0.8 0.15</size></box></geometry></collision>
+      <visual name="vis"><geometry><box><size>1.2 0.8 0.15</size></box></geometry>
+        <material><ambient>0.55 0.35 0.20 1</ambient><diffuse>0.60 0.38 0.22 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- D3: north lane -->
+  <model name="pallet_low_d3">
+    <static>true</static><pose>17.0 11.0 0.075 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>1.2 0.8 0.15</size></box></geometry></collision>
+      <visual name="vis"><geometry><box><size>1.2 0.8 0.15</size></box></geometry>
+        <material><ambient>0.55 0.35 0.20 1</ambient><diffuse>0.60 0.38 0.22 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- D4: near east wall -->
+  <model name="pallet_low_d4">
+    <static>true</static><pose>19.0 5.0 0.075 0 0 1.0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>1.2 0.8 0.15</size></box></geometry></collision>
+      <visual name="vis"><geometry><box><size>1.2 0.8 0.15</size></box></geometry>
+        <material><ambient>0.55 0.35 0.20 1</ambient><diffuse>0.60 0.38 0.22 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- D5: north lane, blocking -->
+  <model name="pallet_low_d5">
+    <static>true</static><pose>17.5 9.5 0.075 0 0 0.5</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>1.2 0.8 0.15</size></box></geometry></collision>
+      <visual name="vis"><geometry><box><size>1.2 0.8 0.15</size></box></geometry>
+        <material><ambient>0.55 0.35 0.20 1</ambient><diffuse>0.60 0.38 0.22 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- D6: near north wall -->
+  <model name="pallet_low_d6">
+    <static>true</static><pose>18.8 13.0 0.075 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>1.2 0.8 0.15</size></box></geometry></collision>
+      <visual name="vis"><geometry><box><size>1.2 0.8 0.15</size></box></geometry>
+        <material><ambient>0.55 0.35 0.20 1</ambient><diffuse>0.60 0.38 0.22 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- ── Full pallets with cargo (spec §1.3.2) ────────────────────────── -->
+  <!-- 4× pallet 1.2×0.8×1.5m. PURPOSE: baseline LiDAR detection. -->
+
+  <model name="pallet_full_a1">
+    <static>true</static><pose>1.5 2.0 0.75 0 0 0</pose>
+    <!-- PURPOSE: Zone A baseline LiDAR obstacle -->
+    <link name="link">
+      <collision name="col"><geometry><box><size>1.2 0.8 1.5</size></box></geometry></collision>
+      <visual name="vis_base"><geometry><box><size>1.2 0.8 0.15</size></box></geometry>
+        <material><ambient>0.55 0.35 0.20 1</ambient><diffuse>0.60 0.38 0.22 1</diffuse></material>
+      </visual>
+      <visual name="vis_cargo"><pose>0 0 0.35 0 0 0</pose>
+        <geometry><box><size>1.1 0.7 0.85</size></box></geometry>
+        <material><ambient>0.72 0.55 0.35 1</ambient><diffuse>0.75 0.58 0.38 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <model name="pallet_full_a2">
+    <static>true</static><pose>2.5 12.5 0.75 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>1.2 0.8 1.5</size></box></geometry></collision>
+      <visual name="vis"><geometry><box><size>1.2 0.8 1.5</size></box></geometry>
+        <material><ambient>0.72 0.55 0.35 1</ambient><diffuse>0.75 0.58 0.38 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <model name="pallet_full_d1">
+    <static>true</static><pose>19.5 2.0 0.75 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>1.2 0.8 1.5</size></box></geometry></collision>
+      <visual name="vis"><geometry><box><size>1.2 0.8 1.5</size></box></geometry>
+        <material><ambient>0.72 0.55 0.35 1</ambient><diffuse>0.75 0.58 0.38 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <model name="pallet_full_d2">
+    <static>true</static><pose>19.5 12.5 0.75 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>1.2 0.8 1.5</size></box></geometry></collision>
+      <visual name="vis"><geometry><box><size>1.2 0.8 1.5</size></box></geometry>
+        <material><ambient>0.72 0.55 0.35 1</ambient><diffuse>0.75 0.58 0.38 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- ── Carton boxes (spec §1.3.8) ───────────────────────────────────── -->
+  <!-- 3× 0.4×0.3×0.35m. z=0.175.
+       PURPOSE I-002: height ≈ LiDAR plane — marginal detection case.
+  -->
+
+  <!-- Zone B main lane — directly in path -->
+  <model name="carton_b1">
+    <static>true</static><pose>8.0 7.5 0.175 0 0 0</pose>
+    <!-- PURPOSE I-002: 0.35m at LiDAR boundary — marginal detection in Zone B lane -->
+    <link name="link">
+      <collision name="col"><geometry><box><size>0.4 0.3 0.35</size></box></geometry></collision>
+      <visual name="vis"><geometry><box><size>0.4 0.3 0.35</size></box></geometry>
+        <material><ambient>0.72 0.55 0.35 1</ambient><diffuse>0.75 0.58 0.38 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- Zone C–D border -->
+  <model name="carton_b2">
+    <static>true</static><pose>15.5 4.5 0.175 0 0 0.8</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>0.4 0.3 0.35</size></box></geometry></collision>
+      <visual name="vis"><geometry><box><size>0.4 0.3 0.35</size></box></geometry>
+        <material><ambient>0.72 0.55 0.35 1</ambient><diffuse>0.75 0.58 0.38 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- Zone D picking area -->
+  <model name="carton_b3">
+    <static>true</static><pose>17.5 6.0 0.175 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>0.4 0.3 0.35</size></box></geometry></collision>
+      <visual name="vis"><geometry><box><size>0.4 0.3 0.35</size></box></geometry>
+        <material><ambient>0.72 0.55 0.35 1</ambient><diffuse>0.75 0.58 0.38 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- ── Debris bag (spec §1.3.9) ─────────────────────────────────────── -->
+  <!-- 0.5m wide × 0.2m tall, DARK (0.2 0.2 0.2).
+       PURPOSE I-002 root-cause-2: low-contrast on gray concrete floor.
+       Camera color-diff detection may miss this object.
+  -->
+  <model name="debris_bag">
+    <static>true</static><pose>11.5 7.5 0.10 0 0 0</pose>
+    <!-- PURPOSE I-002 root-cause-2: dark object, low color deviation from floor -->
+    <link name="link">
+      <collision name="col"><geometry><cylinder><radius>0.25</radius><length>0.20</length></cylinder></geometry></collision>
+      <visual name="vis"><geometry><cylinder><radius>0.25</radius><length>0.20</length></cylinder></geometry>
+        <material><ambient>0.18 0.18 0.18 1</ambient><diffuse>0.20 0.20 0.20 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- ── Forklift static (spec §1.3.7) ────────────────────────────────── -->
+  <!-- 2×1×1.6m, yellow. Zone A corner. PURPOSE: large baseline LiDAR obstacle. -->
+  <model name="forklift">
+    <static>true</static><pose>2.0 1.5 0.80 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>2.0 1.0 1.6</size></box></geometry></collision>
+      <visual name="vis_body"><geometry><box><size>2.0 1.0 1.6</size></box></geometry>
+        <material><ambient>0.85 0.75 0.0 1</ambient><diffuse>0.90 0.80 0.0 1</diffuse></material>
+      </visual>
+      <!-- Forklift forks (two thin horizontal bars) -->
+      <visual name="vis_fork_l"><pose>1.05 -0.20 -0.65 0 0 0</pose>
+        <geometry><box><size>0.10 0.10 0.30</size></box></geometry>
+        <material><ambient>0.60 0.60 0.60 1</ambient><diffuse>0.65 0.65 0.65 1</diffuse></material>
+      </visual>
+      <visual name="vis_fork_r"><pose>1.05  0.20 -0.65 0 0 0</pose>
+        <geometry><box><size>0.10 0.10 0.30</size></box></geometry>
+        <material><ambient>0.60 0.60 0.60 1</ambient><diffuse>0.65 0.65 0.65 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- ── Warehouse signs with poles (spec §1.3.6) ─────────────────────── -->
+  <!-- Pole: 0.05m dia × 2m tall. Sign: 0.5×0.3×0.10m at z=2.1.
+       Colors encode zone identity (no text rendering in SDF).
+       PURPOSE: VLM sign recognition for navigation commands.
+  -->
+
+  <!-- "KHO A" — Zone A entrance — blue -->
+  <model name="sign_kho_a">
+    <static>true</static><pose>2.0 14.0 0 0 0 0</pose>
+    <link name="link">
+      <collision name="col_pole"><pose>0 0 1.0 0 0 0</pose>
+        <geometry><cylinder><radius>0.03</radius><length>2.0</length></cylinder></geometry></collision>
+      <visual name="vis_pole"><pose>0 0 1.0 0 0 0</pose>
+        <geometry><cylinder><radius>0.03</radius><length>2.0</length></cylinder></geometry>
+        <material><ambient>0.5 0.5 0.5 1</ambient><diffuse>0.55 0.55 0.55 1</diffuse></material>
+      </visual>
+      <collision name="col_sign"><pose>0 0 2.1 0 0 0</pose>
+        <geometry><box><size>0.50 0.30 0.10</size></box></geometry></collision>
+      <visual name="vis_sign"><pose>0 0 2.1 0 0 0</pose>
+        <geometry><box><size>0.50 0.30 0.10</size></box></geometry>
+        <material><ambient>0.05 0.20 0.60 1</ambient><diffuse>0.10 0.25 0.65 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- "LANE 1" — Zone B south side — green -->
+  <model name="sign_lane1">
+    <static>true</static><pose>7.0 8.5 0 0 0 0</pose>
+    <link name="link">
+      <collision name="col_pole"><pose>0 0 1.0 0 0 0</pose>
+        <geometry><cylinder><radius>0.03</radius><length>2.0</length></cylinder></geometry></collision>
+      <visual name="vis_pole"><pose>0 0 1.0 0 0 0</pose>
+        <geometry><cylinder><radius>0.03</radius><length>2.0</length></cylinder></geometry>
+        <material><ambient>0.5 0.5 0.5 1</ambient><diffuse>0.55 0.55 0.55 1</diffuse></material>
+      </visual>
+      <collision name="col_sign"><pose>0 0 2.1 0 0 0</pose>
+        <geometry><box><size>0.50 0.30 0.10</size></box></geometry></collision>
+      <visual name="vis_sign"><pose>0 0 2.1 0 0 0</pose>
+        <geometry><box><size>0.50 0.30 0.10</size></box></geometry>
+        <material><ambient>0.05 0.55 0.10 1</ambient><diffuse>0.08 0.60 0.12 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- "LANE 2" — Zone B north side — green darker -->
+  <model name="sign_lane2">
+    <static>true</static><pose>13.0 5.5 0 0 0 0</pose>
+    <link name="link">
+      <collision name="col_pole"><pose>0 0 1.0 0 0 0</pose>
+        <geometry><cylinder><radius>0.03</radius><length>2.0</length></cylinder></geometry></collision>
+      <visual name="vis_pole"><pose>0 0 1.0 0 0 0</pose>
+        <geometry><cylinder><radius>0.03</radius><length>2.0</length></cylinder></geometry>
+        <material><ambient>0.5 0.5 0.5 1</ambient><diffuse>0.55 0.55 0.55 1</diffuse></material>
+      </visual>
+      <visual name="vis_sign"><pose>0 0 2.1 0 0 0</pose>
+        <geometry><box><size>0.50 0.30 0.10</size></box></geometry>
+        <material><ambient>0.03 0.38 0.08 1</ambient><diffuse>0.05 0.42 0.10 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- "PICKING" — Zone D — orange (VinMotion accent) -->
+  <model name="sign_picking">
+    <static>true</static><pose>16.5 7.5 0 0 0 0</pose>
+    <link name="link">
+      <collision name="col_pole"><pose>0 0 1.0 0 0 0</pose>
+        <geometry><cylinder><radius>0.03</radius><length>2.0</length></cylinder></geometry></collision>
+      <visual name="vis_pole"><pose>0 0 1.0 0 0 0</pose>
+        <geometry><cylinder><radius>0.03</radius><length>2.0</length></cylinder></geometry>
+        <material><ambient>0.5 0.5 0.5 1</ambient><diffuse>0.55 0.55 0.55 1</diffuse></material>
+      </visual>
+      <collision name="col_sign"><pose>0 0 2.1 0 0 0</pose>
+        <geometry><box><size>0.50 0.30 0.10</size></box></geometry></collision>
+      <visual name="vis_sign"><pose>0 0 2.1 0 0 0</pose>
+        <geometry><box><size>0.50 0.30 0.10</size></box></geometry>
+        <material><ambient>0.85 0.38 0.05 1</ambient><diffuse>0.90 0.42 0.08 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- ── Lane markings (spec §1.3.4) ──────────────────────────────────── -->
+  <!-- Flat boxes h=0.002m. Yellow center line in Zone B.
+       PURPOSE I-002 root-cause-3: floor sample may pick up yellow → false
+       color deviation → false CAM_AVOID trigger.
+  -->
+
+  <!-- Yellow center line along Zone B (x=4.5→15.5, y=7.5) -->
+  <model name="lane_center_line">
+    <static>true</static><pose>10 7.5 0.001 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>11 0.10 0.002</size></box></geometry></collision>
+      <visual name="vis"><geometry><box><size>11 0.10 0.002</size></box></geometry>
+        <material><ambient>0.95 0.85 0.0 1</ambient><diffuse>1.0 0.90 0.0 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- Red forbidden zone markers near Zone D pallet cluster -->
+  <model name="zone_d_marker_s">
+    <static>true</static><pose>16.5 5.0 0.001 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>0.5 2.0 0.002</size></box></geometry></collision>
+      <visual name="vis"><geometry><box><size>0.5 2.0 0.002</size></box></geometry>
+        <material><ambient>0.85 0.05 0.05 1</ambient><diffuse>0.90 0.08 0.08 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <model name="zone_d_marker_n">
+    <static>true</static><pose>16.5 10.0 0.001 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>0.5 2.0 0.002</size></box></geometry></collision>
+      <visual name="vis"><geometry><box><size>0.5 2.0 0.002</size></box></geometry>
+        <material><ambient>0.85 0.05 0.05 1</ambient><diffuse>0.90 0.08 0.08 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+</world>
+</sdf>
