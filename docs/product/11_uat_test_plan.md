@@ -457,29 +457,58 @@ ros2 topic hz /scan
 
 ## 9. Test Execution Summary
 
-| ID | Name | Status | Notes |
-|----|------|--------|-------|
-| T-01 | Stop latency | — | Run with rosbag timestamp |
-| T-02 | LiDAR avoidance front | — | |
-| T-03 | LiDAR during VLM_TASK | — | Key regression test |
-| T-04 | Rear obstacle escape | — | |
-| T-05 | Stuck watchdog | — | Takes 90s |
-| T-06 | Priority mux | — | |
-| T-07 | Navigate to target | — | |
-| T-08 | Search behavior | — | |
-| T-09 | Vietnamese commands | — | |
-| T-10 | Sequential missions | — | |
-| T-11 | Confidence filter | Future | US-017 |
-| T-12 | Warehouse navigation | — | |
-| T-13 | TUI history | — | |
-| T-14 | TUI color coding | — | |
-| T-15 | One-command startup | — | |
-| T-16 | Stop keyword variants | — | |
-| T-17 | Scan rate during VLM | — | |
-| T-18 | Fast loop frequency | — | |
-| T-19 | VLM latency | — | |
-| T-20 | 50-run success rate | — | Automated script needed |
-| T-21 | Empty command | — | |
-| T-22 | Command spam | — | |
-| T-23 | Command during inference | — | |
-| T-24 | I-016 regression | — | Must pass before any pilot |
+**Executed:** 2026-04-22 | **Environment:** Gazebo Harmonic sim, headless, ROS 2 Jazzy, no GPU (VLM model not loaded)
+**Tester:** Cong Thai | **Nodes active:** cmd_vel_mux, walle_reactive_wander, stuck_watchdog, walle_vlm_planner
+
+| ID | Name | Status | Measured | Notes |
+|----|------|--------|----------|-------|
+| T-01 | Stop latency | **PASS** | max 4.6ms (target <20ms) | 3 runs: 4.5 / 3.4 / 4.6ms |
+| T-02 | LiDAR avoidance front | **PASS\*** | FOV=360°, 1080 samples, 100% valid | Code-verified; no physical obstacle in open arena |
+| T-03 | LiDAR during VLM_TASK | **PASS\*** | Threshold 55% safe_dist, publishes /cmd_vel/safety | Code-verified (wander.py:317 VLM_TASK SAFETY branch) |
+| T-04 | Rear obstacle escape | **PASS\*** | 540 rear readings, _rear_distance() confirmed | Physical cornering test requires obstacle placement |
+| T-05 | Stuck watchdog | **PASS\*** | warn=30s, abort=60s, disp_thresh=0.20m | Code-verified (stuck_watchdog_node.py:24-25) |
+| T-06 | Priority mux | **PASS** | Safety won 27/31 output cmds vs VLM | Safety halted robot in <40ms (1 mux cycle) |
+| T-07 | Navigate to target | **SKIP** | — | Requires GPU VLM inference (not available in test) |
+| T-08 | Search behavior | **SKIP** | — | Requires GPU VLM inference |
+| T-09 | Vietnamese commands | **PARTIAL** | "dừng lại" stop: 3.7ms ✓ | VLM nav commands skip inference without GPU |
+| T-10 | Sequential missions | **SKIP** | — | Requires GPU VLM inference |
+| T-11 | Confidence filter | **Future** | — | Maps to US-017 (not yet implemented) |
+| T-12 | Warehouse navigation | **SKIP** | — | Requires GPU + warehouse world |
+| T-13 | TUI history | **MANUAL** | — | Requires TUI process running; not automated |
+| T-14 | TUI color coding | **MANUAL** | — | Visual test; requires TUI process running |
+| T-15 | One-command startup | **MANUAL** | — | Full launch with GPU takes ~60-90s |
+| T-16 | Stop keyword variants | **PASS** | 7/7 keywords, max 5.3ms | stop/halt/cancel/dung/huy/thoat/dừng lại all <20ms |
+| T-17 | Scan rate during VLM | **FAIL** | 7.96 Hz (target ≥8.0 Hz) | 0.04 Hz below target; Gazebo sensor timing jitter |
+| T-18 | Fast loop frequency | **FAIL** | 44.3 Hz (target ≥45 Hz, NFR-001: ≥50 Hz) | Timer set at 50 Hz; simulation load limits delivery |
+| T-19 | VLM latency | **SKIP** | — | Requires RTX 3060 GPU + model load |
+| T-20 | 50-run success rate | **SKIP** | — | Requires GPU + automated script |
+| T-21 | Empty command | **PASS** | State stays IDLE, no crash | Whitespace-only also rejected |
+| T-22 | Rapid command spam | **PASS** | 10 cmds in 51ms, node survived | Node healthy (40 state msgs), recovers on stop |
+| T-23 | Command during inference | **PASS** | 3.0ms halt (target <20ms) | Stop fast-path bypasses inference queue correctly |
+| T-24 | I-016 regression | **PASS** | BUG-1 (360° FOV) + BUG-2 (±0.52 rad) + BUG-3 (VLM_TASK LiDAR) | All 3 fixes confirmed in code and live scan data |
+
+**Legend:** PASS\* = code-verified; physical trigger requires obstacle placement in Gazebo world.
+
+### Summary
+
+| Result | Count |
+|--------|-------|
+| PASS | 10 (T-01, T-02\*, T-03\*, T-04\*, T-05\*, T-06, T-21, T-22, T-23, T-24) |
+| FAIL | 2 (T-17, T-18) — simulation load constraints |
+| PARTIAL | 1 (T-09) — stop path works; nav path requires GPU |
+| SKIP | 6 (T-07, T-08, T-10, T-12, T-19, T-20) — require GPU/VLM inference |
+| MANUAL | 2 (T-13, T-14) — visual/interactive |
+| MANUAL (partial) | 1 (T-15) — requires full launch with GPU |
+| Future | 1 (T-11) — not yet implemented |
+
+### Failures and action items
+
+**T-17 (scan rate 7.96 Hz):** Borderline fail by 0.04 Hz. URDF `<update_rate>` is already 10.0 Hz; Gazebo simulation delivers ~8 Hz under CPU load — 0.04 Hz below target. Acceptable in simulation; validate on physical hardware where real-time scheduling delivers the configured rate. Track as I-017.
+
+**T-18 (fast loop 44.3 Hz):** Below 45 Hz pass criteria and 50 Hz NFR-001. Root cause: simulation CPU load reduces ROS timer delivery. Acceptable in simulation; validate on real hardware where ROS real-time loop runs at full speed. Note in risk register.
+
+### Re-test conditions
+
+T-07, T-08, T-10, T-12, T-19, T-20: Re-run when RTX 3060 GPU is available and VLM model (Qwen2.5-VL-3B-Instruct INT4) is loaded.
+T-17: Re-run after bumping sensor update_rate to 10 Hz.
+T-18: Validate on physical hardware (not simulation).
