@@ -317,7 +317,13 @@ class VLMPlanner(Node):
 
         # Stable escape via safety channel — direction fixed for 1.5 s.
         if now_t < self._escape_until and self._state not in ('IDLE', 'COMPLETED'):
-            self._pub_safety_cmd(-0.15, self._escape_turn_dir * 0.5)
+            # Check rear before reversing — LiDAR now 360° so rear is available
+            rear_min = self._rear_distance()
+            if rear_min < OBSTACLE_STOP_DIST:
+                # Obstacle also behind: switch to pure rotation instead of reverse
+                self._pub_safety_cmd(0.0, self._escape_turn_dir * 0.5)
+            else:
+                self._pub_safety_cmd(-0.15, self._escape_turn_dir * 0.5)
             self.mode_pub.publish(String(data='EMERGENCY_STOP'))
             return
 
@@ -497,11 +503,29 @@ class VLMPlanner(Node):
     # ── LiDAR helpers ─────────────────────────────────────────────────────────
 
     def _front_distance(self) -> float:
+        """Return min distance in front cone including diagonals.
+
+        Uses same sector definition as wander.py for consistency.
+        Widened from ±0.30 to ±0.52 rad (BUG-2 fix: was missing walls at >17°).
+        """
         with self._scan_lock:
             scan = self._scan
         if scan is None:
             return 99.0
-        return self._sector_min(scan, -0.30, 0.30)
+        front      = self._sector_min(scan, -0.52, 0.52)
+        front_left = self._sector_min(scan,  0.52, 1.05)
+        front_right = self._sector_min(scan, -1.05, -0.52)
+        return min(front, front_left, front_right)
+
+    def _rear_distance(self) -> float:
+        """Return min distance in rear hemisphere (π/2 to 3π/2 — requires 360° LiDAR)."""
+        with self._scan_lock:
+            scan = self._scan
+        if scan is None:
+            return 99.0
+        rear_l = self._sector_min(scan,  1.57, 3.14)
+        rear_r = self._sector_min(scan, -3.14, -1.57)
+        return min(rear_l, rear_r)
 
     @staticmethod
     def _sector_min(scan: ScanState, a_start: float, a_end: float) -> float:
