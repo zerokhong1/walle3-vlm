@@ -29,6 +29,7 @@ setup(
             'cmd_vel_mux = walle_demo.cmd_vel_mux:main',
             'stuck_watchdog = walle_demo.stuck_watchdog_node:main',
             'rosbag_trigger = walle_demo.rosbag_trigger_node:main',
+            'walle_terminal = walle_demo.walle_terminal:main',
         ],
     },
 )
