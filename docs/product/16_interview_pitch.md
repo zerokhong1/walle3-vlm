@@ -16,7 +16,7 @@ WallE3 là robot dịch vụ dùng Vision-Language Model để nhận lệnh t�
 
 WallE3 VLM is an autonomous service robot that understands natural language commands — "go to the orange box", "find the red chair" — using a locally-running Vision-Language Model. No waypoint programming. No cloud dependency.
 
-I built this as both a robotics engineering project and a BA/PM case study. On the engineering side: ROS 2 Jazzy, Qwen2.5-VL running on a $400 GPU, real-time safety loop at 50Hz. On the product side: I wrote a BRD with 8 business requirements, a PRD with 23 functional requirements, a 4-sprint backlog with 14 user stories, a KPI framework tied directly to telemetry events, a FMEA-lite with 12 failure modes, and a 24-scenario UAT plan.
+I built this as both a robotics engineering project and a BA/PM case study. On the engineering side: ROS 2 Jazzy, Qwen2.5-VL running on a $400 GPU, real-time safety loop at 50Hz. On the product side: I wrote a BRD with 8 business requirements, a PRD with 23 functional + 14 non-functional requirements, a 4-sprint backlog with 14 user stories, a KPI framework tied directly to telemetry events, a FMEA-lite with 12 failure modes, and a 24-scenario UAT plan.
 
 The most interesting product challenge was when I discovered the robot was hitting walls without any LiDAR trigger. I ran a structured 6-phase diagnostic — data flow, data quality, logic, priority arbitration — identified 3 root causes across 3 files, fixed them in 3 separate commits, and documented the root cause analysis in the risk register. That's the kind of systematic thinking I bring to product problems.
 
@@ -84,7 +84,7 @@ Three things:
 ## CV Bullets
 
 **Long version:**
-> Productized a ROS 2 + Qwen2.5-VL autonomous robot prototype into a BA/PM-ready robotics MVP by defining BRD (8 business requirements), PRD (23 functional + 9 non-functional requirements), user journey maps, 28-story backlog with acceptance criteria, KPI dashboard spec (8 metrics), event contract v1.0, FMEA-lite risk register (12 failure modes), 24-scenario UAT plan, and 4-release roadmap (R0–R4). Root-caused and fixed an S0 wall-collision regression (I-016) via structured 6-phase diagnostic.
+> Productized a ROS 2 + Qwen2.5-VL autonomous robot prototype into a BA/PM-ready robotics MVP by defining BRD (8 business requirements), PRD (23 functional + 14 non-functional requirements), user journey maps, 14-story delivery backlog with acceptance criteria, KPI dashboard spec (8 metrics), event contract v1.0, FMEA-lite risk register (12 failure modes), 24-scenario UAT plan, and 4-release roadmap (R0–R4). Root-caused and fixed an S0 wall-collision regression (I-016) via structured 6-phase diagnostic.
 
 **Short version:**
 > Built full BA/PM documentation for an autonomous robotics MVP: BRD, PRD, backlog, KPI framework, safety FMEA, UAT plan, and release roadmap from simulation MVP to pilot readiness.

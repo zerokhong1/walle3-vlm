@@ -15,9 +15,11 @@
 
 **Thresholds:** RPN ≥ 40 = S0/Critical | 20–39 = S1/High | 10–19 = S2/Medium | < 10 = S3/Low
 
+**Severity veto rule:** Any failure mode with S=5 (catastrophic — person injury) is classified S0 regardless of RPN, because Occurrence and Detectability cannot be fully validated in simulation. This follows common FMEA practice for life-safety risks.
+
 ---
 
-## S0 — Critical Risks (RPN ≥ 40)
+## S0 — Critical Risks (RPN ≥ 40 or S=5 veto)
 
 ### R-001 — Robot collides with person
 
@@ -30,6 +32,7 @@
 | O | 2 |
 | D | 2 |
 | **RPN** | **20** |
+| **S0 classification** | **Severity veto (S=5, person-contact risk) — cannot be fully validated in simulation** |
 | Current Controls | 360° LiDAR, 50Hz safety check, priority mux P0, contact sensor |
 | Mitigation | Geofence exclusion zones around human work areas; reduce robot speed to 0.15m/s in human-present zones |
 | Residual Risk | Low after mitigation |

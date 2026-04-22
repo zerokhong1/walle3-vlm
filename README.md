@@ -336,11 +336,34 @@ Open issues (S0–S1): I-001, I-002, I-008, I-009, I-010, I-012, I-014.
 
 **Robotics:** ROS 2 Jazzy · Gazebo Harmonic · URDF/Xacro · ros2_control · ros_gz_bridge
 
-**AI/ML:** Qwen2.5-VL-3B-Instruct · HuggingFace Transformers · BitsAndBytes INT4 · OpenCV · YOLOv8
+**AI/ML:** Qwen2.5-VL-3B-Instruct · HuggingFace Transformers · BitsAndBytes INT4 · OpenCV · YOLOv8 *(planned low-obstacle detection fallback — `fallback_to_yolo=false` in config)*
 
 **Languages:** Python 3.12 · XML/SDF · YAML · Bash
 
 **Hardware:** NVIDIA RTX 3060 12 GB · GPU EGL rendering (ogre2)
+
+---
+
+## Robotics Business Analyst Engineer Portfolio Fit
+
+WallE3 VLM is not only a robotics prototype — it is a BA/engineering case study demonstrating how a robotics use case is translated from business problem to deployable technical requirements, telemetry, KPIs, safety controls, and ROI analysis.
+
+| Competency | Evidence in this project |
+|-----------|--------------------------|
+| Market/use-case analysis | Warehouse + mall locate-and-fetch, target users, ROI/TCO assumptions ([docs/business/market_use_case_analysis.md](docs/business/market_use_case_analysis.md)) |
+| Business requirements | BRD with 8 requirements, business context, stakeholders, constraints ([docs/product/02_business_requirements_document.md](docs/product/02_business_requirements_document.md)) |
+| Technical requirements | PRD with 23 functional + 14 non-functional requirements ([docs/product/03_product_requirements_document.md](docs/product/03_product_requirements_document.md)) |
+| User stories & acceptance criteria | 14-story MoSCoW backlog mapped to requirements ([docs/product/06_backlog_user_stories.md](docs/product/06_backlog_user_stories.md)) |
+| Process modeling | Current-state vs future-state workflow analysis + Mermaid diagrams ([docs/business/workflow_analysis.md](docs/business/workflow_analysis.md)) |
+| KPI design | 8 operational KPIs mapped to ROS 2 telemetry topics ([docs/product/08_kpi_dashboard_spec.md](docs/product/08_kpi_dashboard_spec.md)) |
+| Data analytics | SQL queries + Python KPI analysis + dashboard PNG ([analytics/](analytics/)) |
+| Safety governance | FMEA-lite (12 failure modes), priority mux, watchdog, 6-scenario UAT safety tests |
+| Compliance mapping | ISO 3691-4, ISO 13849-1 gap analysis ([docs/safety/compliance_mapping.md](docs/safety/compliance_mapping.md)) |
+| Deployment planning | Site survey checklist, pilot rollout plan ([docs/deployment/](docs/deployment/)) |
+| ROI analysis | ROI/TCO one-pager + SQL ROI query ([docs/product/17_roi_tco_one_pager.md](docs/product/17_roi_tco_one_pager.md)) |
+| Architecture decisions | 4 ADRs with context, alternatives, and tradeoffs ([docs/adr/](docs/adr/)) |
+
+**Status:** Simulation MVP and BA/engineering documentation complete. Physical pilot would require site-specific safety validation, hardware testing, compliance review, and stakeholder approval.
 
 ---
 

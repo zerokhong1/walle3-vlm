@@ -1,0 +1,21 @@
+mission_id,site_id,robot_id,user_command,mission_type,start_ts,end_ts,duration_s,outcome,reason,intervention_count,inference_count,schema_version
+msn_001,warehouse_hn_01,walle3_01,go to the orange box,locate_and_fetch,2026-04-20 09:01:12,2026-04-20 09:02:38,86.0,SUCCESS,target_reached,0,5,1.0
+msn_002,warehouse_hn_01,walle3_01,find the red chair,locate_and_fetch,2026-04-20 09:05:44,2026-04-20 09:07:21,97.0,SUCCESS,target_reached,1,6,1.0
+msn_003,warehouse_hn_01,walle3_01,đi tới thùng màu xanh,locate_and_fetch,2026-04-20 09:10:05,2026-04-20 09:12:05,120.0,FAILED,stuck_timeout_60s,3,8,1.0
+msn_004,warehouse_hn_01,walle3_01,go to the blue pallet,locate_and_fetch,2026-04-20 09:15:30,2026-04-20 09:16:44,74.0,SUCCESS,target_reached,1,4,1.0
+msn_005,warehouse_hn_01,walle3_01,find the yellow box near shelf B,locate_and_fetch,2026-04-20 09:20:11,2026-04-20 09:21:55,104.0,SUCCESS,target_reached,2,7,1.0
+msn_006,warehouse_hn_01,walle3_01,go forward,navigation,2026-04-20 09:25:00,2026-04-20 09:25:45,45.0,SUCCESS,target_reached,1,3,1.0
+msn_007,warehouse_hn_01,walle3_01,navigate to zone A,locate_and_fetch,2026-04-20 09:30:15,2026-04-20 09:32:35,140.0,FAILED,stuck_timeout_60s,4,9,1.0
+msn_008,warehouse_hn_01,walle3_01,find the green container,locate_and_fetch,2026-04-20 09:35:20,2026-04-20 09:36:42,82.0,SUCCESS,target_reached,1,5,1.0
+msn_009,mall_hcm_01,walle3_02,go to the information desk,locate_and_fetch,2026-04-21 10:02:00,2026-04-21 10:03:28,88.0,SUCCESS,target_reached,0,5,1.0
+msn_010,mall_hcm_01,walle3_02,find the red banner,locate_and_fetch,2026-04-21 10:08:14,2026-04-21 10:10:02,108.0,SUCCESS,target_reached,2,7,1.0
+msn_011,mall_hcm_01,walle3_02,go to exit B,navigation,2026-04-21 10:15:30,2026-04-21 10:16:20,50.0,FAILED,operator_stop,0,3,1.0
+msn_012,mall_hcm_01,walle3_02,navigate to the escalator,locate_and_fetch,2026-04-21 10:20:45,2026-04-21 10:22:10,85.0,SUCCESS,target_reached,1,5,1.0
+msn_013,mall_hcm_01,walle3_02,find the blue sign,locate_and_fetch,2026-04-21 10:26:00,2026-04-21 10:28:15,135.0,FAILED,stuck_timeout_60s,5,10,1.0
+msn_014,warehouse_hn_01,walle3_01,go to the orange box,locate_and_fetch,2026-04-21 14:05:00,2026-04-21 14:06:10,70.0,SUCCESS,target_reached,1,4,1.0
+msn_015,warehouse_hn_01,walle3_01,find the red pallet,locate_and_fetch,2026-04-21 14:10:22,2026-04-21 14:11:55,93.0,SUCCESS,target_reached,2,6,1.0
+msn_016,warehouse_hn_01,walle3_01,đi tới khu vực C,locate_and_fetch,2026-04-21 14:16:00,2026-04-21 14:18:00,120.0,FAILED,stuck_timeout_60s,3,8,1.0
+msn_017,warehouse_hn_01,walle3_01,find the white box,locate_and_fetch,2026-04-21 14:22:15,2026-04-21 14:23:30,75.0,SUCCESS,target_reached,1,5,1.0
+msn_018,warehouse_hn_01,walle3_01,go to the carton near shelf D,locate_and_fetch,2026-04-21 14:28:00,2026-04-21 14:29:48,108.0,SUCCESS,target_reached,2,6,1.0
+msn_019,mall_hcm_01,walle3_02,find the promotion stand,locate_and_fetch,2026-04-22 09:05:00,2026-04-22 09:06:22,82.0,SUCCESS,target_reached,1,5,1.0
+msn_020,mall_hcm_01,walle3_02,go to the children zone,locate_and_fetch,2026-04-22 09:12:00,2026-04-22 09:14:00,120.0,FAILED,stuck_timeout_60s,4,9,1.0

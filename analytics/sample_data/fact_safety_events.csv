@@ -1,0 +1,33 @@
+event_id,mission_id,site_id,robot_id,event_type,severity,timestamp,distance_m,channel,notes
+sev_001,msn_002,warehouse_hn_01,walle3_01,collision_risk,HIGH,2026-04-20 09:06:12,0.34,SAFETY,LiDAR front sector triggered escape
+sev_002,msn_003,warehouse_hn_01,walle3_01,collision_risk,HIGH,2026-04-20 09:10:55,0.32,SAFETY,LiDAR front sector — narrow corridor
+sev_003,msn_003,warehouse_hn_01,walle3_01,collision_risk,CRITICAL,2026-04-20 09:11:10,0.28,SAFETY,Multiple escapes triggered in 15s
+sev_004,msn_003,warehouse_hn_01,walle3_01,stuck_abort,CRITICAL,2026-04-20 09:12:05,,,Mission aborted by stuck watchdog at 60s
+sev_005,msn_004,warehouse_hn_01,walle3_01,collision_risk,HIGH,2026-04-20 09:16:02,0.33,SAFETY,LiDAR side sector
+sev_006,msn_005,warehouse_hn_01,walle3_01,collision_risk,HIGH,2026-04-20 09:21:00,0.31,SAFETY,Wall corner approach
+sev_007,msn_005,warehouse_hn_01,walle3_01,collision_risk,HIGH,2026-04-20 09:21:30,0.34,SAFETY,Secondary escape
+sev_008,msn_006,warehouse_hn_01,walle3_01,collision_risk,HIGH,2026-04-20 09:25:20,0.33,SAFETY,Forward command near wall
+sev_009,msn_007,warehouse_hn_01,walle3_01,collision_risk,HIGH,2026-04-20 09:31:00,0.30,SAFETY,Corridor entry
+sev_010,msn_007,warehouse_hn_01,walle3_01,collision_risk,CRITICAL,2026-04-20 09:31:20,0.27,SAFETY,Failed escape — tight space
+sev_011,msn_007,warehouse_hn_01,walle3_01,collision_risk,CRITICAL,2026-04-20 09:31:45,0.26,SAFETY,Re-trigger within escape window
+sev_012,msn_007,warehouse_hn_01,walle3_01,stuck_abort,CRITICAL,2026-04-20 09:32:35,,,Mission aborted by stuck watchdog
+sev_013,msn_008,warehouse_hn_01,walle3_01,collision_risk,HIGH,2026-04-20 09:36:10,0.34,SAFETY,Minor avoidance at corner
+sev_014,msn_010,mall_hcm_01,walle3_02,collision_risk,HIGH,2026-04-21 10:09:00,0.32,SAFETY,Display stand edge
+sev_015,msn_010,mall_hcm_01,walle3_02,collision_risk,HIGH,2026-04-21 10:09:30,0.33,SAFETY,Secondary escape after turn
+sev_016,msn_012,mall_hcm_01,walle3_02,collision_risk,HIGH,2026-04-21 10:21:30,0.34,SAFETY,Escalator approach obstacle
+sev_017,msn_013,mall_hcm_01,walle3_02,collision_risk,HIGH,2026-04-21 10:27:00,0.30,SAFETY,Multiple people in path
+sev_018,msn_013,mall_hcm_01,walle3_02,collision_risk,CRITICAL,2026-04-21 10:27:20,0.27,SAFETY,Emergency stop triggered
+sev_019,msn_013,mall_hcm_01,walle3_02,collision_risk,CRITICAL,2026-04-21 10:27:50,0.25,SAFETY,Third trigger — tight space
+sev_020,msn_013,mall_hcm_01,walle3_02,stuck_abort,CRITICAL,2026-04-21 10:28:15,,,Mission aborted by stuck watchdog
+sev_021,msn_015,warehouse_hn_01,walle3_01,collision_risk,HIGH,2026-04-21 14:11:00,0.33,SAFETY,Shelf approach
+sev_022,msn_015,warehouse_hn_01,walle3_01,collision_risk,HIGH,2026-04-21 14:11:20,0.34,SAFETY,Secondary
+sev_023,msn_016,warehouse_hn_01,walle3_01,collision_risk,HIGH,2026-04-21 14:16:40,0.32,SAFETY,Corner entry
+sev_024,msn_016,warehouse_hn_01,walle3_01,collision_risk,CRITICAL,2026-04-21 14:16:55,0.28,SAFETY,Repeated escape
+sev_025,msn_016,warehouse_hn_01,walle3_01,stuck_abort,CRITICAL,2026-04-21 14:18:00,,,Mission aborted
+sev_026,msn_017,warehouse_hn_01,walle3_01,collision_risk,HIGH,2026-04-21 14:23:00,0.33,SAFETY,Post-abort residual approach
+sev_027,msn_018,warehouse_hn_01,walle3_01,collision_risk,HIGH,2026-04-21 14:28:55,0.31,SAFETY,Shelf D approach
+sev_028,msn_018,warehouse_hn_01,walle3_01,collision_risk,HIGH,2026-04-21 14:29:20,0.34,SAFETY,Secondary escape
+sev_029,msn_019,mall_hcm_01,walle3_02,collision_risk,HIGH,2026-04-22 09:05:50,0.33,SAFETY,Stand approach
+sev_030,msn_020,mall_hcm_01,walle3_02,collision_risk,HIGH,2026-04-22 09:13:00,0.30,SAFETY,Children zone obstacle
+sev_031,msn_020,mall_hcm_01,walle3_02,collision_risk,CRITICAL,2026-04-22 09:13:20,0.26,SAFETY,CRITICAL trigger
+sev_032,msn_020,mall_hcm_01,walle3_02,stuck_abort,CRITICAL,2026-04-22 09:14:00,,,Watchdog abort
